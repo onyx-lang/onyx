@@ -3,10 +3,14 @@
 #include "parser.h"
 #include "utils.h"
 
-#define MSG_HOST_INIT          0
-#define MSG_HOST_TERMINATE     1
-#define MSG_HOST_EXPAND_MACRO  2
-#define MSG_HOST_HOOK          3
+#include <stdlib.h>
+#include <string.h>
+
+#define MSG_HOST_INIT              0
+#define MSG_HOST_TERMINATE         1
+#define MSG_HOST_EXPAND_MACRO      2
+#define MSG_HOST_HOOK              3
+#define MSG_HOST_COMPILATION_EVENTS 4
 
 #define MSG_EXT_INIT             0
 #define MSG_EXT_ERROR_REPORT     1
@@ -14,35 +18,120 @@
 #define MSG_EXT_INJECT_CODE      3
 #define MSG_EXT_ACKNOWLEDGE_HOOK 4
 
-#define HOOK_STALLED 1
+#define HOOK_STALLED                      1
+#define HOOK_COMPILATION_EVENTS           2
+#define HOOK_COMPILATION_EVENTS_LEGACY    3
+#define HOOK_ALL_CODE_CHECKED             4
 
 
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+#include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
+#include <sys/socket.h>
 #include <sys/wait.h>
 #include <sys/poll.h>
+#include <unistd.h>
+
+#define EXT_IO_BUF (1 << 20)
+
+static void extension_set_sock_buf(int fd) {
+    int sz = EXT_IO_BUF;
+    setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sz, sizeof(sz));
+    setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &sz, sizeof(sz));
+#ifdef SO_NOSIGPIPE
+    int one = 1;
+    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one));
+#endif
+}
+
+static b32 extension_make_channel(i32 fds[2]) {
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0) {
+        extension_set_sock_buf(fds[0]);
+        extension_set_sock_buf(fds[1]);
+        return 1;
+    }
+
+    if (pipe(fds) != 0) return 0;
+#ifdef F_SETPIPE_SZ
+    fcntl(fds[0], F_SETPIPE_SZ, EXT_IO_BUF);
+    fcntl(fds[1], F_SETPIPE_SZ, EXT_IO_BUF);
+#endif
+    return 1;
+}
+
+static void extension_set_nonblock(int fd, b32 nb) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0) return;
+    if (nb) fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    else    fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+}
+
+static void extension_try_flush(CompilerExtension *ext) {
+    if (!ext->alive || !ext->outgoing.data) return;
+
+    while (ext->outgoing_off < ext->outgoing.length) {
+        i32 remain = ext->outgoing.length - ext->outgoing_off;
+        i32 w = write((int) ext->send_file, ext->outgoing.data + ext->outgoing_off, remain);
+        if (w > 0) {
+            ext->outgoing_off += w;
+            continue;
+        }
+        if (w < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
+            break;
+        }
+        ext->alive = 0;
+        break;
+    }
+
+    if (ext->outgoing_off >= ext->outgoing.length) {
+        bh_buffer_clear(&ext->outgoing);
+        ext->outgoing_off = 0;
+    } else if (ext->outgoing_off > 64 * 1024) {
+        i32 remain = ext->outgoing.length - ext->outgoing_off;
+        if (remain > 0) {
+            memmove(ext->outgoing.data, ext->outgoing.data + ext->outgoing_off, remain);
+        }
+        ext->outgoing.length = remain;
+        ext->outgoing_off = 0;
+    }
+}
+
+static void extension_drain(CompilerExtension *ext) {
+    if (!ext->alive || !ext->outgoing.data) return;
+
+    extension_set_nonblock((int) ext->send_file, 0);
+    while (ext->outgoing_off < ext->outgoing.length) {
+        i32 remain = ext->outgoing.length - ext->outgoing_off;
+        i32 w = write((int) ext->send_file, ext->outgoing.data + ext->outgoing_off, remain);
+        if (w > 0) {
+            ext->outgoing_off += w;
+            continue;
+        }
+        ext->alive = 0;
+        break;
+    }
+    bh_buffer_clear(&ext->outgoing);
+    ext->outgoing_off = 0;
+    if (ext->alive) extension_set_nonblock((int) ext->send_file, 1);
+}
 
 static void extension_send(CompilerExtension *ext, void *data, i32 len) {
     if (!ext->alive) return;
+    if (!ext->outgoing.data) return;
 
-    i32 wrote = 0;
-    while (wrote < len) {
-        i32 w = write(ext->send_file, bh_pointer_add(data, wrote), len - wrote);
-        if (w > 0) wrote += w;
-        else {
-            ext->alive = 0;
-            return;
-        }
-    }
+    bh_buffer_append(&ext->outgoing, data, len);
+    extension_try_flush(ext);
 }
 
 static b32 extension_poll_recv(CompilerExtension *ext) {
     struct pollfd fd;
     fd.events = POLL_IN;
     fd.fd = ext->recv_file;
+    fd.revents = 0;
 
-    poll(&fd, 1, 0);
-
+    if (poll(&fd, 1, 0) < 0) return 0;
+    if (fd.revents & (POLLERR | POLLHUP | POLLNVAL)) return 1;
     return (fd.revents & POLL_IN) != 0;
 }
 
@@ -72,7 +161,7 @@ static b32 extension_spawn(CompilerExtension *ext, const char *path) {
     i32 ext_to_comp[2];
     i32 comp_to_ext[2];
 
-    if (pipe(ext_to_comp) || pipe(comp_to_ext)) {
+    if (!extension_make_channel(ext_to_comp) || !extension_make_channel(comp_to_ext)) {
         return 0;
     }
 
@@ -91,6 +180,8 @@ static b32 extension_spawn(CompilerExtension *ext, const char *path) {
 
             dup2(comp_to_ext[0], 0);
             dup2(ext_to_comp[1], 1);
+            if (comp_to_ext[0] != 0) close(comp_to_ext[0]);
+            if (ext_to_comp[1] != 1) close(ext_to_comp[1]);
 
             execlp("onyx", "onyx", "run", "--no-compiler-extensions", "--no-file-contents", path, NULL);
             exit(1);
@@ -105,12 +196,19 @@ static b32 extension_spawn(CompilerExtension *ext, const char *path) {
     ext->pid = pid;
     ext->send_file = comp_to_ext[1];
     ext->recv_file = ext_to_comp[0];
+    extension_set_nonblock((int) ext->send_file, 1);
     return 1;
 }
 
 #endif
 
 #ifdef _BH_WINDOWS
+
+static void extension_try_flush(CompilerExtension *ext) {
+}
+
+static void extension_drain(CompilerExtension *ext) {
+}
 
 static void extension_send(CompilerExtension *ext, void *data, i32 len) {
 }
@@ -191,7 +289,72 @@ static char *extension_recv_str(CompilerExtension *ext, i32 *out_len) {
     return buf;
 }
 
+static void compiler_extension_send_compilation_events(Context *context, CompilerExtension *ext) {
+    if (!ext->alive || !ext->supports_compilation_events) return;
+    if (ext->state != COMP_EXT_STATE_READY) return;
 
+    u32 from = ext->compilation_events_cursor;
+    u32 to = (u32)bh_arr_length(context->compilation_log.events);
+    if (from >= to) return;
+
+    CompilationLog *log = &context->compilation_log;
+    bh_buffer_clear(&log->pb_flush);
+    compilation_log_encode_range(context, from, to, &log->pb_flush);
+
+    extension_send_int(ext, MSG_HOST_COMPILATION_EVENTS);
+    extension_send_bytes(ext, log->pb_flush.data, log->pb_flush.length);
+
+    ext->compilation_events_cursor = to;
+    if (to > log->delivered_until) log->delivered_until = to;
+}
+
+#define COMPILATION_EVENTS_FLUSH_BATCH 8192
+
+void compiler_extensions_flush_compilation_events(Context *context) {
+    bh_arr_each(CompilerExtension, ext, context->extensions) {
+        u32 pending = (u32)bh_arr_length(context->compilation_log.events);
+        if (pending > ext->compilation_events_cursor &&
+            pending - ext->compilation_events_cursor >= COMPILATION_EVENTS_FLUSH_BATCH) {
+            compiler_extension_send_compilation_events(context, ext);
+        }
+        extension_try_flush(ext);
+    }
+}
+
+void compiler_extensions_flush_compilation_events_now(Context *context) {
+    bh_arr_each(CompilerExtension, ext, context->extensions) {
+        compiler_extension_send_compilation_events(context, ext);
+        extension_try_flush(ext);
+    }
+}
+
+static i32 extension_queued_entity_count(Context *context) {
+    EntityHeap *h = &context->entities;
+    i32 n = h->ready.count + h->retry_count;
+    i32 heap_n = bh_arr_length(h->entities);
+    if (h->detached_top) heap_n -= 1;
+    if (heap_n > 0) n += heap_n;
+    return n;
+}
+
+// Yield only when something else can run. If the leftover queue is just
+// other extensions also waiting on their children, block instead of spinning.
+static b32 extension_startup_has_other_work(Context *context) {
+    i32 queued = extension_queued_entity_count(context);
+    if (queued <= 0) return 0;
+
+    i32 waiting_in_queue = 0;
+    bh_arr_each(CompilerExtension, ext, context->extensions) {
+        if (!ext->alive) continue;
+        if (ext->state != COMP_EXT_STATE_SPAWNING && ext->state != COMP_EXT_STATE_INITIATING) continue;
+        if (context->checker.current_entity && ext->entity == context->checker.current_entity) continue;
+        waiting_in_queue++;
+    }
+
+    return queued > waiting_in_queue;
+}
+
+b32 compiler_extension_negotiate_capabilities(Context *context, CompilerExtension *ext);
 
 TypeMatch compiler_extension_start(Context *context, const char *name, const char *containing_filename, Entity *ent, i32 *out_extension_id) {
     if (*out_extension_id == 0) {
@@ -207,6 +370,7 @@ TypeMatch compiler_extension_start(Context *context, const char *name, const cha
         }
 
         CompilerExtension ext;
+        memset(&ext, 0, sizeof(ext));
         ext.state = COMP_EXT_STATE_SPAWNING;
         bh_arena_init(&ext.arena, context->gp_alloc, 1 * 1024 * 1024); // 1MB
         ext.entity = ent;
@@ -218,6 +382,7 @@ TypeMatch compiler_extension_start(Context *context, const char *name, const cha
         ext.alive = 1;
         ext.id = bh_arr_length(context->extensions) + 1;
         *out_extension_id = ext.id;
+        bh_buffer_init(&ext.outgoing, context->gp_alloc, 64 * 1024);
         bh_arr_push(context->extensions, ext);
 
         // Init message is 5 ints as defined in `core/onyx/compiler_extension`
@@ -226,24 +391,34 @@ TypeMatch compiler_extension_start(Context *context, const char *name, const cha
         init_msg[1] = VERSION_MAJOR;
         init_msg[2] = VERSION_MINOR;
         init_msg[3] = VERSION_PATCH;
-        init_msg[4] = 1;
+        init_msg[4] = 4;
 
-        extension_send(&ext, init_msg, sizeof(init_msg));
+        CompilerExtension *stored = &context->extensions[ext.id - 1];
+        extension_send(stored, init_msg, sizeof(init_msg));
 
         return TYPE_MATCH_YIELD;
 
     } else {
         CompilerExtension *ext = &context->extensions[*out_extension_id - 1];
+        if (!ext->alive) return TYPE_MATCH_FAILED;
+
+        extension_try_flush(ext);
+
+        if (!extension_poll_recv(ext)) {
+            if (extension_startup_has_other_work(context)) {
+                return TYPE_MATCH_YIELD;
+            }
+        }
 
         ext->state = COMP_EXT_STATE_INITIATING;
+        extension_drain(ext);
 
-        b32 compiler_extension_negotiate_capabilities(Context *context, CompilerExtension *ext);
-        b32 negotiated = compiler_extension_negotiate_capabilities(context, ext);
-        if (!negotiated) {
+        if (!compiler_extension_negotiate_capabilities(context, ext)) {
             return TYPE_MATCH_FAILED;
         }
 
         ext->state = COMP_EXT_STATE_READY;
+        compiler_extensions_flush_compilation_events_now(context);
         return TYPE_MATCH_SUCCESS;
     }
 }
@@ -265,7 +440,10 @@ b32 compiler_extension_negotiate_capabilities(Context *context, CompilerExtensio
         fori (i, 0, hook_count) {
             int hook = extension_recv_int(ext);
 
-            if (hook == 1) ext->supports_stalled_hook = 1;
+            if (hook == HOOK_STALLED) ext->supports_stalled_hook = 1;
+            if (hook == HOOK_COMPILATION_EVENTS || hook == HOOK_COMPILATION_EVENTS_LEGACY)
+                ext->supports_compilation_events = 1;
+            if (hook == HOOK_ALL_CODE_CHECKED) ext->supports_all_code_checked_hook = 1;
         }
     }
 
@@ -308,6 +486,16 @@ static AstNode * parse_code(Context *context, ProceduralMacroExpansionKind kind,
     }
 
     onyx_parser_free(&parser);
+
+    // Code from an extension is new work, so any earlier conclusion that the
+    // compiler had stalled no longer holds. Leaving cycle_detected set would
+    // turn the first yield from this code (instantiating a polymorphic type,
+    // for instance) into a hard error instead of a retry.
+    context->watermarked_node = NULL;
+    context->highest_watermark = 0;
+    context->cycle_almost_detected = 0;
+    context->cycle_detected = 0;
+
     return result;
 }
 
@@ -323,7 +511,8 @@ static b32 handle_common_messages(Context *context, CompilerExtension *ext, int 
             u32 line = extension_recv_int(ext);
             u32 column = extension_recv_int(ext);
             u32 length = extension_recv_int(ext);
-            char *msg =  extension_recv_str(ext, NULL);
+            char *msg = extension_recv_str(ext, NULL);
+            if (!msg) msg = "";
 
             OnyxFilePos pos;
             pos.column = column + (line == tkn->pos.line ? 2 : 0);
@@ -388,8 +577,13 @@ TypeMatch compiler_extension_expand_macro(
 
     if (!ext->alive) return TYPE_MATCH_FAILED;
 
-    if (ext->state != COMP_EXT_STATE_READY && ext->current_expansion_id != (i32) *expansion_id) {
-        return TYPE_MATCH_YIELD;
+    // Not ready yet (still spawning / negotiating), or busy with a
+    // different expansion / hook. Do not read from the pipe or we can
+    // steal the child's INIT message.
+    if (ext->state != COMP_EXT_STATE_READY) {
+        if (ext->state != COMP_EXT_STATE_EXPANDING || ext->current_expansion_id != (i32) *expansion_id) {
+            return TYPE_MATCH_YIELD;
+        }
     }
 
     bh_arena_clear(&ext->arena);
@@ -400,7 +594,7 @@ TypeMatch compiler_extension_expand_macro(
         *expansion_id = ++context->next_expansion_id;
         ext->current_expansion_id = *expansion_id;
         ext->state = COMP_EXT_STATE_EXPANDING;
-        
+
         extension_send_int(ext, MSG_HOST_EXPAND_MACRO);
         extension_send_int(ext, *expansion_id);
         extension_send_int(ext, kind);
@@ -410,6 +604,7 @@ TypeMatch compiler_extension_expand_macro(
         extension_send_int(ext, 0);
         extension_send_str(ext, macro_name);
         extension_send_bytes(ext, body->text, body->length);
+        extension_send_int(ext, entity && entity->scope ? (int) entity->scope->id : 0);
     }
 
     while (1) {
@@ -417,6 +612,7 @@ TypeMatch compiler_extension_expand_macro(
             return TYPE_MATCH_YIELD;
         }
 
+        extension_drain(ext);
         int msg_type = extension_recv_int(ext);
 
         if (msg_type == MSG_EXT_EXPANSION) {
@@ -450,6 +646,7 @@ TypeMatch compiler_extension_expand_macro(
 
             ext->state = COMP_EXT_STATE_READY;
             ext->current_expansion_id = 0;
+            compiler_extensions_flush_compilation_events_now(context);
             return TYPE_MATCH_SUCCESS;
         }
 
@@ -460,25 +657,22 @@ TypeMatch compiler_extension_expand_macro(
 }
 
 
-TypeMatch compiler_extension_hook_stalled(Context *context, int extension_id) {
-    if (extension_id <= 0 || extension_id > bh_arr_length(context->extensions)) return TYPE_MATCH_FAILED;
-
-    CompilerExtension *ext = &context->extensions[extension_id - 1];
-    if (!ext->supports_stalled_hook) return TYPE_MATCH_FAILED;
-
+static TypeMatch compiler_extension_send_hook(Context *context, CompilerExtension *ext, int hook) {
     if (!ext->alive) return TYPE_MATCH_FAILED;
+    if (ext->state != COMP_EXT_STATE_READY) return TYPE_MATCH_FAILED;
 
-    if (ext->state != COMP_EXT_STATE_READY) {
-        return TYPE_MATCH_FAILED;
-    }
+    // Deliver remaining compilation events before the hook so the
+    // extension's CompilationInfo is complete (needed on stall to
+    // generate code for types that were only just recorded).
+    compiler_extension_send_compilation_events(context, ext);
 
     bh_arena_clear(&ext->arena);
-
     ext->state = COMP_EXT_STATE_HANDLING_HOOK;
-    
+
     extension_send_int(ext, MSG_HOST_HOOK);
-    extension_send_int(ext, HOOK_STALLED);
-    extension_send_int(ext, HOOK_STALLED);
+    extension_send_int(ext, hook);
+    extension_send_int(ext, hook);
+    extension_drain(ext);
 
     OnyxToken *tkn = ext->entity->compiler_extension->token;
 
@@ -487,14 +681,14 @@ TypeMatch compiler_extension_hook_stalled(Context *context, int extension_id) {
 
         if (msg_type == MSG_EXT_ACKNOWLEDGE_HOOK) {
             u32 id = extension_recv_int(ext);
-            if (id != HOOK_STALLED) {
-                // PROTOCOL ERROR
+            if (id != (u32) hook) {
                 extension_kill(ext);
                 ONYX_ERROR(tkn->pos, Error_Critical, "Protocol error when talking to '%s'.", ext->name);
                 return TYPE_MATCH_FAILED;
             }
 
             ext->state = COMP_EXT_STATE_READY;
+            compiler_extensions_flush_compilation_events_now(context);
             return TYPE_MATCH_SUCCESS;
         }
 
@@ -504,22 +698,52 @@ TypeMatch compiler_extension_hook_stalled(Context *context, int extension_id) {
     }
 }
 
+TypeMatch compiler_extension_hook_stalled(Context *context, int extension_id) {
+    if (extension_id <= 0 || extension_id > bh_arr_length(context->extensions)) return TYPE_MATCH_FAILED;
+
+    CompilerExtension *ext = &context->extensions[extension_id - 1];
+    if (!ext->supports_stalled_hook) return TYPE_MATCH_FAILED;
+
+    return compiler_extension_send_hook(context, ext, HOOK_STALLED);
+}
+
+TypeMatch compiler_extension_hook_all_code_checked(Context *context, int extension_id) {
+    if (extension_id <= 0 || extension_id > bh_arr_length(context->extensions)) return TYPE_MATCH_FAILED;
+
+    CompilerExtension *ext = &context->extensions[extension_id - 1];
+    if (!ext->supports_all_code_checked_hook) return TYPE_MATCH_FAILED;
+
+    return compiler_extension_send_hook(context, ext, HOOK_ALL_CODE_CHECKED);
+}
+
 void compiler_extension_terminate(Context *context, int extension_id) {
     if (extension_id <= 0 || extension_id > bh_arr_length(context->extensions)) return;
 
     CompilerExtension *ext = &context->extensions[extension_id - 1];
 
     if (!ext->alive) return;
-    if (ext->state != COMP_EXT_STATE_READY) return;
 
-    extension_send_int(ext, MSG_HOST_TERMINATE);
+    compiler_extension_send_compilation_events(context, ext);
 
-    compiler_event_log(
-        context,
-        "Waiting for extension '%s' to exit...",
-        ext->name
-    );
+    if (ext->state == COMP_EXT_STATE_READY) {
+        extension_send_int(ext, MSG_HOST_TERMINATE);
+        extension_drain(ext);
 
-    extension_wait(ext);
+        compiler_event_log(
+            context,
+            "Waiting for extension '%s' to exit...",
+            ext->name
+        );
+
+        extension_wait(ext);
+    } else {
+        extension_kill(ext);
+    }
+
+    if (ext->send_file) close((int) ext->send_file);
+    if (ext->recv_file) close((int) ext->recv_file);
+    ext->send_file = 0;
+    ext->recv_file = 0;
+    ext->alive = 0;
 }
 

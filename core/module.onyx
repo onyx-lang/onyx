@@ -18,6 +18,7 @@ use runtime
 #load "./container/optional"
 #load "./container/result"
 #load "./container/slice"
+#load "./container/buf"
 
 #load "./conv/conv"
 #load "./conv/format"
@@ -25,6 +26,7 @@ use runtime
 
 #load "./math/math"
 #load "./math/consts"
+#load "./libc/libc"
 #load "./random/random"
 
 #load "./hash/hash"
@@ -39,6 +41,7 @@ use runtime
 #load "./string/buffer"
 #load "./string/char_utils"
 #load "./string/string_pool"
+#load "./bytes/bytes"
 
 #load "./intrinsics/onyx"
 #load "./intrinsics/wasm"
@@ -50,7 +53,6 @@ use runtime
 #load "./io/reader"
 #load "./io/writer"
 #load "./io/binary"
-#load "./io/binary_reader"
 
 #load "./runtime/build_opts"
 #load "./runtime/common"
@@ -58,8 +60,11 @@ use runtime
 
 #load "./test/testing"
 
+#load "./time/duration"
 #load "./time/time"
 #load "./time/date"
+#load "./time/instant"
+#load "./time/timer"
 
 #load "./misc/arg_parse"
 #load "./misc/method_ops"
@@ -143,6 +148,14 @@ use runtime
     #load "./runtime/platform/wasi/platform"
 }
 
+#if runtime.runtime == .Wasip2 {
+    #load "./runtime/platform/wasip2/platform"
+}
+
 #if runtime.runtime == .Js {
     #load "./runtime/platform/js/platform"
+}
+
+#if runtime.runtime == .Custom && #defined(runtime.vars.Component_Build) {
+    #load "./runtime/platform/component/platform"
 }

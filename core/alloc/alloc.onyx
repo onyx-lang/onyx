@@ -24,20 +24,28 @@ as_allocator :: #match {
 }
 
 /// Allocates memory from the stack. This is similar to `alloca` in C.
+/// The adjustment is rounded up so `__stack_top` stays 16-byte aligned.
 ///
 /// **DO NOT USE THIS IN A LOOP! You cannot free memory allocated off the stack.**
 from_stack :: macro (size: u32) -> rawptr {
-    // This should do something about the alignment...
-    // Everything so far has assume that the stack is aligned to 16 bytes.
-    __stack_top = cast([&]u8, __stack_top) - size;
+    aligned := size;
+    rem := aligned & 15;
+    if rem != 0 do aligned += 16 - rem;
+
+    __stack_top = cast([&]u8, __stack_top) - aligned;
     return __stack_top;
 }
 
 /// Allocates memory from the stack to form a slice of `T` with length `size`.
+/// The adjustment is rounded up so `__stack_top` stays 16-byte aligned.
 ///
 /// **DO NOT USE THIS IN A LOOP! You cannot free memory allocated off the stack.**
 array_from_stack :: macro ($T: type_expr, size: u32) -> [] T {
-    __stack_top = cast([&]u8, __stack_top) - size * sizeof T;
+    bytes := size * cast(u32) sizeof T;
+    rem := bytes & 15;
+    if rem != 0 do bytes += 16 - rem;
+
+    __stack_top = cast([&]u8, __stack_top) - bytes;
     return (cast([&]T) __stack_top)[0 .. size];
 }
 
@@ -89,7 +97,7 @@ heap_allocator : Allocator;
 
 // The global temp allocator, set up upon program intialization.
 #local #thread_local
-temp_state     : arena.ArenaState;
+temp_state     : arena.Arena;
 
 #thread_local
 temp_allocator : Allocator;
@@ -98,20 +106,20 @@ temp_allocator : Allocator;
 ///
 /// You do not need to call this. It is called automatically on thread initialization.
 init_temp_allocator :: () {
-    temp_state = arena.make(heap_allocator, TEMPORARY_ALLOCATOR_SIZE);
+    temp_state = arena.Arena.make(heap_allocator, TEMPORARY_ALLOCATOR_SIZE);
     temp_allocator = as_allocator(&temp_state);
 }
 
 /// Resets the temporary allocator, effectively freeing all allocations made in the temporary allocator.
 clear_temp_allocator :: () {
-    arena.clear(&temp_state);
+    arena.Arena.clear(&temp_state);
 }
 
 
 report_leaks_in_scope :: macro () {
     use core.alloc
 
-    use __ha := alloc.debug.make(context.allocator)
+    use __ha := alloc.debug.Debug_State.make(context.allocator)
 
     __old_allocator := context.allocator
     context.allocator = alloc.as_allocator(&__ha)

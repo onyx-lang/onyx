@@ -19,7 +19,7 @@ main :: (args: [] cstr) {
     slice : [] i32;
 
     // Slices have two members, data and count. You can set them directly.
-    slice.data  = ^arr[3];
+    slice.data  = &arr[3];
     slice.count = 4;
 
     // You can iterate over slices directly using a for-loop.

@@ -2,12 +2,6 @@ package core.hash
 
 use core.intrinsics.types {type_is_enum}
 
-//
-// DEPRECATED: to_u32 is the old name that kind of
-// makes sense, but is a little unintuitive. Use
-// core.hash.hash instead.
-to_u32 :: hash
-
 /// This overloaded procedure defines how to hash something.
 /// It is used throughout the standard library to hash values.
 /// There are many overloads to it in the standard library, and

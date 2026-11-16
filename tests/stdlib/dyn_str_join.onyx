@@ -1,0 +1,15 @@
+use core {*}
+
+// @leak-check
+
+main :: () {
+    s := dyn_str.join(.[ "a", "b", "c" ], ",");
+    defer delete(&s);
+    println(s);
+
+    u := make(dyn_str);
+    defer delete(&u);
+    u->append("n=");
+    u->append_format("{}", 3);
+    println(u);
+}

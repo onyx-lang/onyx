@@ -1,5 +1,12 @@
 Computing foo...
 Foo { x = "a", y = "b", z = "c" }
+Computing foo...
+Foo { x = "a", y = "b", z = "c" }
+mutated
+true
+mutated
+7
+true
 BLUE: { brightness = 1234 }
 Color was not green!
 Color was not red but got default value of: 0

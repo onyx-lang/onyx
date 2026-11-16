@@ -2,7 +2,6 @@ package core.time
 
 use core
 use core.io
-use core.string
 use core.conv
 use runtime
 
@@ -35,7 +34,12 @@ Timestamp.as_date :: (t: Timestamp) -> Date {
     return Date.make(t.year + 1900, t.mon + 1, t.mday);
 }
 
-Timestamp.to_epoch :: to_epoch
+Timestamp.to_epoch  :: to_epoch
+Timestamp.parse     :: strptime
+/// UTC civil time. There is no timezone database; this is the same as `gmtime`.
+/// Use `Instant.to_timestamp(offset)` / `Offset_Time` for a fixed offset.
+Timestamp.localtime :: localtime
+Timestamp.gmtime    :: gmtime
 
 /// Formats a timestamp into a string.
 Timestamp.format :: (t: Timestamp, format := "%Y-%m-%d %H:%M:%S") -> str {
@@ -56,51 +60,51 @@ Timestamp.format :: (t: Timestamp, format := "%Y-%m-%d %H:%M:%S") -> str {
     return strptime(data, "%Y-%m-%d %H:%M:%S", time);
 }
 
-/// Returns the current system time at UTC-0.
-now :: () -> Timestamp {
+/// Returns the current system time at UTC.
+Timestamp.now :: () -> Timestamp {
     current_time: i64;
     #if runtime.platform.Supports_Time {
-        current_time = runtime.platform.__time();
+        current_time = cast(i64) runtime.platform.__time();
     } else {
         current_time = 0;
     }
 
-    //
-    // Localtime operates on seconds, while os.time
-    // returns milliseconds.
     return gmtime(current_time / 1000);
 }
 
+/// Current UTC time. Same as `Timestamp.now`.
+now :: Timestamp.now
+
 to_epoch :: tm_to_time
 
-/// Converts UNIX epoch time to a timestamp, relative to the current timezone.
-///
-/// *Note, this function is currently not implemented correctly as there is no reliable way to get the current system timezone. It is currently equivalent to `gmtime`*
+/// Converts UNIX epoch seconds to a timestamp. Always UTC; there is no timezone database.
+/// `localtime` is identical to `gmtime`. For a chosen offset, use `Instant.to_timestamp(offset)`.
 localtime :: #match #local {}
 
 #overload
 localtime :: time_to_tm
 
 #overload
+localtime :: (seconds: i64) -> Timestamp {
+    return gmtime(seconds);
+}
+
+#overload
 localtime :: (seconds: u64) -> Timestamp {
-    t: Timestamp;
-    localtime(seconds, &t);
-    return t;
+    return gmtime(cast(i64) seconds);
 }
 
 
-/// Converts UNIX epoch time to a timestamp, relative to the Greenich mean time.
-//
-/// *Note, this function is currently not implemented correctly as there is no reliable way to get the current system timezone. It is currently equivalent to `gmtime`*
+/// Converts UNIX epoch seconds to a timestamp in UTC.
 gmtime :: #match #local {}
 
 #overload
 gmtime :: time_to_tm
 
 #overload
-gmtime :: (seconds: u64) -> Timestamp {
+gmtime :: (seconds: i64) -> Timestamp {
     t: Timestamp;
-    gmtime(seconds, &t);
+    time_to_tm(seconds, &t);
     return t;
 }
 
@@ -144,6 +148,10 @@ strftime :: #match #local {}
 ///
 /// **%w** Numeric day of week (0, ..., 6)
 ///
+/// **%F** ISO date (2023-08-31)
+///
+/// **%s** Unix seconds
+///
 /// **%Y** Year
 ///
 /// **%y** 2-digit year
@@ -151,18 +159,15 @@ strftime :: #match #local {}
 /// **%%** Percent-sign
 #overload
 strftime :: (format_: [] u8, tm: &Timestamp) -> str {
-    s := io.buffer_stream_make();
-    w := io.writer_make(&s, 0);
-
-    strftime(&w, format_, tm);
-
-    return str.as_str(&s);
+    buf: [256] u8;
+    s := strftime(buf, format_, tm);
+    return str.copy(s);
 }
 
 #overload
 strftime :: (buf: [] u8, format_: [] u8, tm: &Timestamp) -> str {
-    s := io.buffer_stream_make(buf, fixed=true);
-    w := io.writer_make(&s, 0);
+    s := io.BufferStream.make(buf, fixed=true);
+    w := io.Writer.make(&s, 0);
 
     strftime(&w, format_, tm);
 
@@ -180,60 +185,63 @@ strftime :: (w: &io.Writer, format_: [] u8, tm: &Timestamp) {
         c := format[0];
         switch c {
             case '%' {
-                string.advance(&format);
+                str.advance(&format);
                 switch format[0] {
                     case 'A', 'a' {
                         day := weekdays[tm.wday];
                         len := 3 if format[0] == 'a' else day.length;
 
-                        io.write_format(w, "{}{}", day[0]->to_upper(), day[1..len]);
+                        io.Writer.write_format(w, "{}{}", day[0]->to_upper(), day[1..len]);
                     }
 
                     case 'B', 'b', 'h' {
                         mon := monthnames[tm.mon];
                         len := 3 if format[0] != 'B' else mon.length;
 
-                        io.write_format(w, "{}{}", mon[0]->to_upper(), mon[1..len]);
+                        io.Writer.write_format(w, "{}{}", mon[0]->to_upper(), mon[1..len]);
                     }
 
                     case 'd', 'e' {
-                        io.write_format(w, "{w2}", tm.mday);
+                        io.Writer.write_format(w, "{w2}", tm.mday);
                     }
 
                     case 'D' {
-                        io.write_format(w, "{w2}/{w2}/{}", tm.mon + 1, tm.mday, tm.year - 100 if tm.year >= 100 else tm.year);
+                        io.Writer.write_format(w, "{w2}/{w2}/{}", tm.mon + 1, tm.mday, tm.year - 100 if tm.year >= 100 else tm.year);
                     }
 
-                    case 'H' do io.write_format(w, "{w2}", tm.hour);
-                    case 'I' do io.write_format(w, "{w2}", hour_to_12h(tm.hour));
-                    case 'j' do io.write_format(w, "{}", tm.yday + 1);
-                    case 'm' do io.write_format(w, "{w2}", tm.mon + 1);
-                    case 'M' do io.write_format(w, "{w2}", tm.min);
-                    case 'p' do io.write(w, "am" if tm.hour < 12 else "pm");
+                    case 'H' do io.Writer.write_format(w, "{w2}", tm.hour);
+                    case 'I' do io.Writer.write_format(w, "{w2}", hour_to_12h(tm.hour));
+                    case 'j' do io.Writer.write_format(w, "{}", tm.yday + 1);
+                    case 'm' do io.Writer.write_format(w, "{w2}", tm.mon + 1);
+                    case 'M' do io.Writer.write_format(w, "{w2}", tm.min);
+                    case 'p' do io.Writer.write(w, "am" if tm.hour < 12 else "pm");
 
                     case 'r' {
-                        io.write_format(w, "{w2}:{w2}:{w2} {}", hour_to_12h(tm.hour), tm.min, tm.sec,
+                        io.Writer.write_format(w, "{w2}:{w2}:{w2} {}", hour_to_12h(tm.hour), tm.min, tm.sec,
                             "am" if tm.hour < 12 else "pm");
                     }
 
                     case 'R' {
-                        io.write_format(w, "{w2}:{w2}", tm.hour, tm.min);
+                        io.Writer.write_format(w, "{w2}:{w2}", tm.hour, tm.min);
                     }
 
-                    case 'S' do io.write_format(w, "{w2}", tm.sec);
-                    case 'T' do io.write_format(w, "{}", tm.wday);
-                    case 'Y' do io.write_format(w, "{}", tm.year + 1900);
-                    case 'y' do io.write_format(w, "{w2}", tm.year - 100 if tm.year >= 100 else tm.year);
-                    case '%' do io.write(w, "%");
+                    case 'S' do io.Writer.write_format(w, "{w2}", tm.sec);
+                    case 'T' do io.Writer.write_format(w, "{w2}:{w2}:{w2}", tm.hour, tm.min, tm.sec);
+                    case 'w' do io.Writer.write_format(w, "{}", tm.wday);
+                    case 'F' do io.Writer.write_format(w, "{}-{w2}-{w2}", tm.year + 1900, tm.mon + 1, tm.mday);
+                    case 's' do io.Writer.write_format(w, "{}", tm_to_time(*tm));
+                    case 'Y' do io.Writer.write_format(w, "{}", tm.year + 1900);
+                    case 'y' do io.Writer.write_format(w, "{w2}", tm.year - 100 if tm.year >= 100 else tm.year);
+                    case '%' do io.Writer.write(w, "%");
                 }
             }
 
             case _ {
-                io.write(w, c);
+                io.Writer.write(w, c);
             }
         }
 
-        string.advance(&format);
+        str.advance(&format);
     }
 
     hour_to_12h :: (h: i32) -> i32 {
@@ -270,18 +278,18 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
         c := format[0];
         switch c {
             case '%' {
-                string.advance(&format);
+                str.advance(&format);
                 switch format[0] {
                     case 'a', 'A' {
                         for i in weekdays.count {
                             w := weekdays[i];
-                            if string.equal_insensitive(w, buf[0 .. w.length]) {
-                                string.advance(&buf, w.length);
+                            if str.equal_insensitive(w, buf[0 .. w.length]) {
+                                str.advance(&buf, w.length);
                                 tm.wday = i;
                                 break break;
 
-                            } elseif string.equal_insensitive(w[0 .. 3], buf[0 .. 3]) {
-                                string.advance(&buf, 3);
+                            } elseif str.equal_insensitive(w[0 .. 3], buf[0 .. 3]) {
+                                str.advance(&buf, 3);
                                 tm.wday = i;
                                 break break;
                             }
@@ -294,13 +302,13 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                     case 'b', 'B', 'h' {
                         for i in monthnames.count {
                             m := monthnames[i];
-                            if string.equal_insensitive(m, buf[0 .. m.length]) {
-                                string.advance(&buf, m.length);
+                            if str.equal_insensitive(m, buf[0 .. m.length]) {
+                                str.advance(&buf, m.length);
                                 tm.mon = i;
                                 break break;
 
-                            } elseif string.equal_insensitive(m[0 .. 3], buf[0 .. 3]) {
-                                string.advance(&buf, 3);
+                            } elseif str.equal_insensitive(m[0 .. 3], buf[0 .. 3]) {
+                                str.advance(&buf, 3);
                                 tm.mon = i;
                                 break break;
                             }
@@ -319,12 +327,12 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                         if !working do break;
 
                         if buf[0] == '/' {
-                            string.advance(&buf);
+                            str.advance(&buf);
                             working = parse_number_and_advance(&buf, &tm.mday, 1, 31, 0);
                             if !working do break;
 
                             if buf[0] == '/' {
-                                string.advance(&buf);
+                                str.advance(&buf);
                                 working = parse_number_and_advance(&buf, &tm.year, 0, 99, 0);
                                 if working && tm.year < 69 {
                                     tm.year += 100;
@@ -338,16 +346,16 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                     case 'j' do working = parse_number_and_advance(&buf, &tm.yday, 1, 366, -1);
                     case 'm' do working = parse_number_and_advance(&buf, &tm.mon, 1, 12, -1);
                     case 'M' do working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0);
-                    case 'n', 't' do string.strip_leading_whitespace(&buf);
+                    case 'n', 't' do str.strip_leading_whitespace(&buf);
 
                     case 'p' {
-                        if string.equal_insensitive(buf[0 .. 2], "am") {
+                        if str.equal_insensitive(buf[0 .. 2], "am") {
                             if tm.hour == 12 do tm.hour = 0;
-                            string.advance(&buf, 2);
+                            str.advance(&buf, 2);
 
-                        } elseif string.equal_insensitive(buf[0 .. 2], "pm") {
+                        } elseif str.equal_insensitive(buf[0 .. 2], "pm") {
                             if tm.hour < 12 do tm.hour += 12;
-                            string.advance(&buf, 2);
+                            str.advance(&buf, 2);
 
                         } else {
                             working = false;
@@ -359,26 +367,26 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                         if !working do break;
 
                         if buf[0] == ':' {
-                            string.advance(&buf);
+                            str.advance(&buf);
 
                             working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0);
                             if !working do break;
 
                             if buf[0] == ':' {
-                                string.advance(&buf);
+                                str.advance(&buf);
 
                                 working = parse_number_and_advance(&buf, &tm.sec, 0, 59, 0);
                                 if !working do break;
 
-                                string.strip_leading_whitespace(&buf);
+                                str.strip_leading_whitespace(&buf);
 
-                                if string.equal_insensitive(buf[0 .. 2], "am") {
+                                if str.equal_insensitive(buf[0 .. 2], "am") {
                                     if tm.hour == 12 do tm.hour = 0;
-                                    string.advance(&buf, 2);
+                                    str.advance(&buf, 2);
 
-                                } elseif string.equal_insensitive(buf[0 .. 2], "pm") {
+                                } elseif str.equal_insensitive(buf[0 .. 2], "pm") {
                                     if tm.hour < 12 do tm.hour += 12;
-                                    string.advance(&buf, 2);
+                                    str.advance(&buf, 2);
 
                                 } else {
                                     working = false;
@@ -388,11 +396,11 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                     }
 
                     case 'R' {
-                        working = parse_number_and_advance(&buf, &tm.hour, 1, 12, 0);
+                        working = parse_number_and_advance(&buf, &tm.hour, 0, 23, 0);
                         if !working do break;
 
                         if buf[0] == ':' {
-                            string.advance(&buf);
+                            str.advance(&buf);
 
                             working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0);
                         }
@@ -401,20 +409,46 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                     case 'S' do working = parse_number_and_advance(&buf, &tm.sec, 0, 59, 0);
 
                     case 'T' {
-                        working = parse_number_and_advance(&buf, &tm.hour, 1, 12, 0);
+                        working = parse_number_and_advance(&buf, &tm.hour, 0, 23, 0);
                         if !working do break;
 
                         if buf[0] == ':' {
-                            string.advance(&buf);
+                            str.advance(&buf);
 
                             working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0);
                             if !working do break;
 
                             if buf[0] == ':' {
-                                string.advance(&buf);
+                                str.advance(&buf);
 
                                 working = parse_number_and_advance(&buf, &tm.sec, 0, 59, 0);
                             }
+                        }
+                    }
+
+                    case 'F' {
+                        working = parse_number_and_advance(&buf, &tm.year, 1900, 65535, -1900);
+                        if !working do break;
+                        if buf.count == 0 || buf[0] != '-' {
+                            working = false;
+                            break;
+                        }
+                        str.advance(&buf);
+                        working = parse_number_and_advance(&buf, &tm.mon, 1, 12, -1);
+                        if !working do break;
+                        if buf.count == 0 || buf[0] != '-' {
+                            working = false;
+                            break;
+                        }
+                        str.advance(&buf);
+                        working = parse_number_and_advance(&buf, &tm.mday, 1, 31, 0);
+                    }
+
+                    case 's' {
+                        unix: i32;
+                        working = parse_number_and_advance(&buf, &unix, 0, 0x7fffffff, 0);
+                        if working {
+                            time_to_tm(cast(i64) unix, tm);
                         }
                     }
 
@@ -432,7 +466,7 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                         if buf[0] != '%' {
                             working = false;
                         }
-                        string.advance(&buf);
+                        str.advance(&buf);
                     }
 
                     case _ {
@@ -442,7 +476,7 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
             }
 
             case ' ', '\t', '\r', '\n', '\f', '\v' {
-                string.strip_leading_whitespace(&buf);
+                str.strip_leading_whitespace(&buf);
             }
 
             case _ {
@@ -450,12 +484,12 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                     working = false;
 
                 } else {
-                    string.advance(&buf);
+                    str.advance(&buf);
                 }
             }
         }
 
-        string.advance(&format);
+        str.advance(&format);
     }
 
     return working;
@@ -474,7 +508,7 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
 
             n *= 10;
             n += ~~(c - '0');
-            string.advance(buf);
+            str.advance(buf);
         }
 
         if n >= low && n <= high {
@@ -495,14 +529,25 @@ time_to_tm :: (ts: i64, tm: &Timestamp) {
         i64.[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
     ];
 
-    year := 1970;
-    dayclock := ts % 86400;
     dayno := ts / 86400;
+    dayclock := ts % 86400;
+    if dayclock < 0 {
+        dayno -= 1;
+        dayclock += 86400;
+    }
 
     tm.sec = ~~(dayclock % 60);
     tm.min = ~~((dayclock % 3600) / 60);
     tm.hour = ~~(dayclock / 3600);
-    tm.wday = ~~((dayno + 4) % 7);
+    tm.wday = ~~(((dayno % 7) + 11) % 7); // 1970-01-01 was Thursday (4); keep 0=Sunday
+
+    year := 1970;
+    while dayno < 0 {
+        year -= 1;
+        yearsize := 366 if leapyear(year) else 365;
+        dayno += ~~yearsize;
+    }
+
     while true {
         yearsize := 366 if leapyear(year) else 365;
         if dayno >= ~~yearsize {

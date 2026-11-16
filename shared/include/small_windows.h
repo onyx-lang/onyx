@@ -390,10 +390,18 @@ GB_DLL_IMPORT void   WINAPI GetSystemInfo(SYSTEM_INFO *system_info);
 #define FILE_ATTRIBUTE_TEMPORARY 0x00000100
 #define FILE_ATTRIBUTE_DIRECTORY 0x00000010
 #define ERROR_FILE_NOT_FOUND     2l
+#define ERROR_PATH_NOT_FOUND     3L
 #define ERROR_ACCESS_DENIED      5L
 #define ERROR_NO_MORE_FILES      18l
+#define ERROR_SHARING_VIOLATION  32L
 #define ERROR_FILE_EXISTS        80l
+#define ERROR_INVALID_NAME       123L
 #define ERROR_ALREADY_EXISTS     183l
+#define FILE_BEGIN               0
+#define FILE_CURRENT             1
+#define FILE_END                 2
+#define FILE_APPEND_DATA         0x0004
+#define SYNCHRONIZE              0x00100000L
 #define STD_INPUT_HANDLE         ((DWORD)-10)
 #define STD_OUTPUT_HANDLE        ((DWORD)-11)
 #define STD_ERROR_HANDLE         ((DWORD)-12)
@@ -473,3 +481,25 @@ GB_DLL_IMPORT BOOL  SetCurrentDirectoryA(char *lpPathName);
 
 GB_DLL_IMPORT DWORD GetFileAttributesA(char *lpPathName);
 GB_DLL_IMPORT BOOL  SetFileAttributesA(char *lpPathName, DWORD attrs);
+
+typedef char *LPCH;
+
+typedef struct _RTL_CRITICAL_SECTION {
+    void *DebugInfo;
+    LONG LockCount;
+    LONG RecursionCount;
+    HANDLE OwningThread;
+    HANDLE LockSemaphore;
+    ULONG_PTR SpinCount;
+} CRITICAL_SECTION, *LPCRITICAL_SECTION;
+
+GB_DLL_IMPORT void WINAPI InitializeCriticalSection(CRITICAL_SECTION *section);
+GB_DLL_IMPORT void WINAPI EnterCriticalSection(CRITICAL_SECTION *section);
+GB_DLL_IMPORT void WINAPI LeaveCriticalSection(CRITICAL_SECTION *section);
+GB_DLL_IMPORT void WINAPI DeleteCriticalSection(CRITICAL_SECTION *section);
+
+GB_DLL_IMPORT LPCH WINAPI GetEnvironmentStringsA(void);
+GB_DLL_IMPORT BOOL WINAPI FreeEnvironmentStringsA(LPCH env);
+
+GB_DLL_IMPORT BOOL WINAPI CreateSymbolicLinkA(char const *link, char const *target, DWORD flags);
+GB_DLL_IMPORT BOOL WINAPI CreateHardLinkA(char const *link, char const *target, SECURITY_ATTRIBUTES *security);

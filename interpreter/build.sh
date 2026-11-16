@@ -5,8 +5,8 @@
 FLAGS="-O3 -fno-stack-protector"
 LIBS="-pthread"
 TARGET="../shared/lib/$ONYX_ARCH/lib/libovmwasm.a"
-C_FILES="src/ovmwasm.c src/vm/*.c src/wasm/*.c src/debug/*.c"
-INCLUDES="-I../shared/include -Iinclude"
+C_FILES="src/ovmwasm.c src/vm/*.c src/wasm/*.c src/debug/*.c src/jit/*.c"
+INCLUDES="-I../shared/include -Iinclude -Isrc/jit"
 
 if [ ! -z ${ONYX_TARGET+x} ]; then
     FLAGS="$FLAGS --target=$ONYX_TARGET"
@@ -16,6 +16,9 @@ mkdir -p "build_tmp"
 
 echo "Compiling ovmwasm to $TARGET"
 for c_file in $C_FILES; do
+    case "$c_file" in
+        *native_main.c) continue ;;
+    esac
     $ONYX_CC $FLAGS $INCLUDES -fPIC -o build_tmp/$(basename $c_file).o -c $c_file $LIBS
 done
 

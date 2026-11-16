@@ -22,6 +22,8 @@ enum instr_format_kind_t {
     instr_format_br_cond,
     instr_format_bri,
     instr_format_bri_cond,
+    instr_format_imm_binop,
+    instr_format_br_cmp,
 
     instr_format_call,
     instr_format_calli,
@@ -127,7 +129,27 @@ static instr_format_t instr_formats[] = {
     { "break", instr_format_none },
 
     { "memory_size", instr_format_none },
-    { "memory_grow", instr_format_ra }
+    { "memory_grow", instr_format_ra },
+
+    { "add_imm", instr_format_imm_binop },
+    { "sub_imm", instr_format_imm_binop },
+    { "mul_imm", instr_format_imm_binop },
+    { "and_imm", instr_format_imm_binop },
+    { "or_imm", instr_format_imm_binop },
+    { "xor_imm", instr_format_imm_binop },
+    { "shl_imm", instr_format_imm_binop },
+    { "shr_imm", instr_format_imm_binop },
+    { "sar_imm", instr_format_imm_binop },
+    { "br_eq", instr_format_br_cmp },
+    { "br_ne", instr_format_br_cmp },
+    { "br_lt", instr_format_br_cmp },
+    { "br_lt_s", instr_format_br_cmp },
+    { "br_le", instr_format_br_cmp },
+    { "br_le_s", instr_format_br_cmp },
+    { "br_gt", instr_format_br_cmp },
+    { "br_gt_s", instr_format_br_cmp },
+    { "br_ge", instr_format_br_cmp },
+    { "br_ge_s", instr_format_br_cmp },
 };
 
 void ovm_disassemble(ovm_program_t *program, u32 instr_addr, bh_buffer *instr_text) {
@@ -172,6 +194,8 @@ void ovm_disassemble(ovm_program_t *program, u32 instr_addr, bh_buffer *instr_te
 
         case instr_format_br:       formatted = snprintf(buf, 255, "%d", instr_addr + instr->a + 1); break;
         case instr_format_br_cond:  formatted = snprintf(buf, 255, "%d, %%%d", instr_addr + instr->a + 1, instr->b); break;
+        case instr_format_imm_binop: formatted = snprintf(buf, 255, "%%%d, %%%d, %d", instr->r, instr->a, instr->b); break;
+        case instr_format_br_cmp:    formatted = snprintf(buf, 255, "%d, %%%d, %%%d", instr_addr + instr->r + 1, instr->a, instr->b); break;
         case instr_format_bri:      formatted = snprintf(buf, 255, "ip + %%%d", instr->a); break;
         case instr_format_bri_cond: formatted = snprintf(buf, 255, "ip + %%%d, %%%d", instr->a, instr->b); break;
 

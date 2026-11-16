@@ -44,7 +44,7 @@ main :: (args: [] cstr) {
     // in the type. The access the arguments, you need to use the builtin procedure,
     // 'vararg_get'. This procedure has two overloads that you can use:
     //
-    //   vararg_get :: (va: vararg, res: ^$T) -> bool
+    //   vararg_get :: (va: vararg, res: &$T) -> bool
     //   vararg_get :: (va: vararg, $T: type_expr, default: T) -> (bool, T)
     //
     // The 'bool' returned is whether or not retrieving the vararg was successful. This
@@ -63,7 +63,7 @@ main :: (args: [] cstr) {
     //     print("Untyped variadic arguments: ");
 
     //     x: i32;
-    //     while vararg_get(args, ^x) {
+    //     while vararg_get(args, &x) {
     //         printf("{} ", cast(rawptr) x);
     //     }
 

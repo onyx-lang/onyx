@@ -38,7 +38,6 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Error: return sizeof(AstNode);
         case Ast_Kind_Package: return sizeof(AstPackage);
         case Ast_Kind_Load: return sizeof(AstInclude);
-        case Ast_Kind_Load_All: return sizeof(AstInclude);
         case Ast_Kind_Memres: return sizeof(AstMemRes);
         case Ast_Kind_Binding: return sizeof(AstBinding);
         case Ast_Kind_Function: return sizeof(AstFunction);
@@ -106,7 +105,6 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Directive_Defined: return sizeof(AstDirectiveDefined);
         case Ast_Kind_Do_Block: return sizeof(AstDoBlock);
         case Ast_Kind_Constraint: return sizeof(AstConstraint);
-        case Ast_Kind_Directive_Remove: return sizeof(AstDirectiveRemove);
         case Ast_Kind_Directive_First: return sizeof(AstDirectiveFirst);
         case Ast_Kind_Directive_Export_Name: return sizeof(AstDirectiveExportName);
         case Ast_Kind_Import: return sizeof(AstImport);
@@ -115,6 +113,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Union_Type: return sizeof(AstUnionType);
         case Ast_Kind_Procedural_Expansion: return sizeof(AstProceduralExpansion);
         case Ast_Kind_Code_Block: return sizeof(AstCodeBlock);
+        case Ast_Kind_Object_Block: return sizeof(AstObjectBlock);
 
         default: break;
     }
@@ -175,6 +174,7 @@ AstNode* ast_clone(Context *context, void* n) {
     memmove(nn, node, node_size);
 
     nn->flags &= ~(Ast_Flag_Has_Been_Checked | Ast_Flag_Has_Been_Symres);
+    nn->compilation_symbol_id = 0;
 
     switch ((u16) node->kind) {
         case Ast_Kind_Binary_Op:
@@ -400,6 +400,9 @@ AstNode* ast_clone(Context *context, void* n) {
             }
 
             ds->stcache = NULL;
+            ds->poly_type = NULL;
+            ds->poly_owner = NULL;
+            ds->compilation_tags_emitted = 0;
             break;
         }
 
@@ -438,6 +441,9 @@ AstNode* ast_clone(Context *context, void* n) {
             }
 
             du->utcache = NULL;
+            du->poly_type = NULL;
+            du->poly_owner = NULL;
+            du->compilation_tags_emitted = 0;
             break;
         }
 
@@ -517,7 +523,7 @@ AstNode* ast_clone(Context *context, void* n) {
                 convert_polyproc_to_function(df);
             }
 
-            if (sf->is_foreign) return node;
+            if (sf->is_foreign || sf->is_object_link) return node;
             assert(df->scope == NULL);
 
             df->nodes_that_need_entities_after_clone = NULL;
@@ -568,6 +574,8 @@ AstNode* ast_clone(Context *context, void* n) {
                 }
             }
 
+            df->compilation_tags_emitted = 0;
+
             if (sf->tags) {
                 bh_arr_new(context->ast_alloc, df->tags, bh_arr_length(sf->tags));
                 bh_arr_each(AstTyped *, pexpr, sf->tags) {
@@ -615,6 +623,8 @@ AstNode* ast_clone(Context *context, void* n) {
 
             dd->poly_proc = (AstFunction *) ast_clone(context, (AstNode *) sd->poly_proc);
             dd->resolved_proc = NULL;
+            dd->from_arguments = sd->from_arguments;
+            arguments_deep_clone(context, &dd->args, &sd->args);
 
             dd->known_polyvars = NULL;
             bh_arr_new(context->gp_alloc, dd->known_polyvars, bh_arr_length(sd->known_polyvars));
@@ -743,6 +753,8 @@ AstFunction* clone_function_header(Context *context, AstFunction* func) {
 
     AstFunction* new_func = onyx_ast_node_new(context->ast_alloc, sizeof(AstFunction), func->kind);
     memmove(new_func, func, sizeof(AstFunction));
+    new_func->compilation_symbol_id = 0;
+    new_func->compilation_tags_emitted = 0;
     assert(new_func->scope == NULL);
 
     convert_polyproc_to_function(new_func);

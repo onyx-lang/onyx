@@ -109,6 +109,7 @@ typedef struct UnionVariant {
     u32 tag_value;
     bh_arr(struct AstTyped *) meta_tags;
     struct OnyxToken *token;
+    struct AstUnionVariant *variant_node;
 } UnionVariant;
 
 #define TYPE_KINDS \
@@ -294,5 +295,7 @@ Type* type_struct_is_just_one_basic_value(Type *type);
 u32 type_union_get_variant_count(Type *type);
 UnionVariant* type_lookup_union_variant_by_idx(Type* type, i32 idx);
 UnionVariant* type_lookup_union_variant_by_name(Type* type, char *name);
+UnionVariant* type_lookup_union_variant_by_tag(Type* type, u32 tag);
+ i32 type_lookup_union_variant_idx_by_tag(Type* type, u32 tag);
 
 #endif // #ifndef ONYX_TYPES

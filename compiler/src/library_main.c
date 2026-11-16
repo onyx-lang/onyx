@@ -1,36 +1,27 @@
 //
-// HACK
+// stb_ds arrays/hashmaps always pass a NULL context to REALLOC/FREE.
+// Each compilation context has its own heap; we point this thread-local
+// at it on every public API entry so two compilations can run on two
+// threads. A single onyx_context_t is still not safe to use concurrently.
 //
-// Currently, in stb_ds.h there is no way to choose the allocator
-// for arrays, and in turn hashmaps. You can provide your own
-// REALLOC and FREE macros, but the context pointer they are given
-// is always NULL. In order to allocate and free from the global
-// heap allocator, there needs to be a *global* pointer to it.
-// This is a problem for the compiler as it is meant to be a DLL,
-// so there should not be any global state in it.
-//
-// The tradeoff here is either:
-//
-//  1. The compiler is no longer thread-safe and only one compilation should
-//     be done per process at any given time.
-//
-//  2. The compiler leaks memory after every compilation. (around 400K for
-//     a hello world program).
-//
-// With those two options, I'm choosing the former. Most uses of the compiler
-// should not be multi-threaded in that way (at least I don't think so... time
-// may prove me wrong)
-//
-static void * HACK_global_heap_allocator = (void *) 0;
+
+
+#if defined(_MSC_VER)
+    #define ONYX_THREAD_LOCAL __declspec(thread)
+#else
+    #define ONYX_THREAD_LOCAL __thread
+#endif
+
+static ONYX_THREAD_LOCAL void * stbds_heap_allocator = (void *) 0;
 
 #define STBDS_REALLOC(c, p, s) \
-    (HACK_global_heap_allocator) ? \
-        (bh_resize(*(bh_allocator *) HACK_global_heap_allocator, p, s)) : \
+    (stbds_heap_allocator) ? \
+        (bh_resize(*(bh_allocator *) stbds_heap_allocator, p, s)) : \
         (realloc(p, s))
 
 #define STBDS_FREE(c, p) \
-    (HACK_global_heap_allocator) ? \
-        (bh_free(*(bh_allocator *) HACK_global_heap_allocator, p)) : \
+    (stbds_heap_allocator) ? \
+        (bh_free(*(bh_allocator *) stbds_heap_allocator, p)) : \
         (free(p))
 
 #define BH_DEFINE
@@ -100,6 +91,7 @@ static AstInclude* create_load(Context *context, char* filename, int32_t length)
 static void introduce_defined_variables(Context *context);
 static void create_and_add_defined_variable(Context *context, DefinedVariable *var);
 static void link_wasm_module(Context *context);
+static void __library_code_entry(onyx_context_t *ctx);
 
 
 //
@@ -118,21 +110,18 @@ onyx_context_t *onyx_context_create() {
 
     bh_managed_heap_init(&context->heap);
     context->gp_alloc = bh_managed_heap_allocator(&context->heap);
-
-    if (HACK_global_heap_allocator) {
-        printf("[WARNING] The Onyx compiler is being used by multiple threads at once. This is currently not supported and may result in catastrophic errors.\n");
-
-    } else {
-        HACK_global_heap_allocator = (void *) &context->gp_alloc;
-    }
-
+    context->stbds_alloc = &context->gp_alloc;
     context->token_alloc = context->gp_alloc;
+
+    __library_code_entry(ctx);
 
     // NOTE: Create the arena where tokens and AST nodes will exist
     // Prevents nodes from being scattered across memory due to fragmentation
     bh_arena_init(&context->ast_arena, context->gp_alloc, 16 * 1024 * 1024); // 16MB
     context->ast_alloc = bh_arena_allocator(&context->ast_arena);
 
+    compilation_log_init(context);
+    atom_table_init(context);
     types_init(context);
     prepare_builtins(context);
     compiler_events_init(context);
@@ -160,6 +149,7 @@ onyx_context_t *onyx_context_create() {
 }
 
 void onyx_context_free(onyx_context_t *ctx) {
+    __library_code_entry(ctx);
 	Context *context = &ctx->context;
 
     bh_arr_each(CompilerExtension, ext, context->extensions) {
@@ -169,18 +159,20 @@ void onyx_context_free(onyx_context_t *ctx) {
     onyx_wasm_module_free(context->wasm_module);
     bh_arena_free(&context->ast_arena);
     bh_arr_free(context->loaded_files);
+    bh_arr_free(context->file_overlays);
     bh_scratch_free(&context->scratch);
     bh_managed_heap_free(&context->heap);
 
     bh_arr_free(context->options.mapped_folders);
-    free(ctx);
 
-    HACK_global_heap_allocator = NULL;
+    free(ctx);
+    stbds_heap_allocator = (void *) 0;
 }
 
-static void parse_source_file(Context *context, bh_file_contents* file_contents) {
+static void parse_source_file(Context *context, bh_file_contents* file_contents, u32 file_id) {
     // :Remove passing the allocators as parameters
     OnyxTokenizer tokenizer = onyx_tokenizer_create(context, file_contents);
+    tokenizer.file_id = file_id;
     onyx_lex_tokens(&tokenizer);
 
     file_contents->line_count = tokenizer.line_number;
@@ -190,11 +182,75 @@ static void parse_source_file(Context *context, bh_file_contents* file_contents)
     onyx_parser_free(&parser);
 }
 
+static b32 overlay_path_match(const char *a, const char *b) {
+    if (!a || !b) return 0;
+    if (!strcmp(a, b)) return 1;
+
+    i32 i = (i32) strlen(a);
+    i32 j = (i32) strlen(b);
+    while (i > 0 && j > 0) {
+        i -= 1;
+        j -= 1;
+        char ca = a[i] == '\\' ? '/' : a[i];
+        char cb = b[j] == '\\' ? '/' : b[j];
+        if (ca != cb) return 0;
+    }
+
+    if (i == 0 && j == 0) return 1;
+    if (i == 0 && j > 0 && (b[j - 1] == '/' || b[j - 1] == '\\')) return 1;
+    if (j == 0 && i > 0 && (a[i - 1] == '/' || a[i - 1] == '\\')) return 1;
+    return 0;
+}
+
+static char *overlay_canon_name(Context *context, char *filename) {
+    if (!filename) return filename;
+    if (!bh_file_exists(filename)) return filename;
+    char *full = bh_path_get_full_name(filename, context->gp_alloc);
+    if (full) return full;
+    return filename;
+}
+
+static CompilationFileOverlay *find_file_overlay(Context *context, const char *filename) {
+    if (!filename || !context->file_overlays) return NULL;
+
+    const char *lookup = filename;
+    if (bh_file_exists((char *) filename)) {
+        char *full = bh_path_get_full_name((char *) filename, context->scratch_alloc);
+        if (full) lookup = full;
+    }
+
+    bh_arr_each(CompilationFileOverlay, o, context->file_overlays) {
+        if (overlay_path_match(o->filename, lookup)) return o;
+        if (lookup != filename && overlay_path_match(o->filename, filename)) return o;
+    }
+    return NULL;
+}
+
+static bh_file_contents file_contents_from_overlay(Context *context, const char *filename, CompilationFileOverlay *ov) {
+    bh_file_contents fc;
+    memset(&fc, 0, sizeof fc);
+    fc.allocator = context->token_alloc;
+    fc.length = ov->length > 0 ? ov->length : 0;
+    fc.data = bh_alloc(context->token_alloc, fc.length + 1);
+    if (fc.length > 0 && ov->data) memcpy(fc.data, ov->data, fc.length);
+    ((char *) fc.data)[fc.length] = '\0';
+    fc.filename = bh_strdup(context->token_alloc, (char *) filename);
+    return fc;
+}
+
 static b32 process_source_file(Context *context, char* filename) {
     bh_arr_each(bh_file_contents, fc, context->loaded_files) {
         // Duplicates are detected here and since these filenames will be the full path,
         // string comparing them should be all that is necessary.
         if (!strcmp(fc->filename, filename)) return 1;
+    }
+
+    CompilationFileOverlay *ov = find_file_overlay(context, filename);
+    if (ov) {
+        bh_arr_push(context->loaded_files, file_contents_from_overlay(context, filename, ov));
+        u32 file_id = compilation_log_emit_file(context, bh_arr_last(context->loaded_files).filename);
+        parse_source_file(context, &bh_arr_last(context->loaded_files), file_id);
+        return 1;
     }
 
     bh_file file;
@@ -207,11 +263,12 @@ static b32 process_source_file(Context *context, char* filename) {
     bh_file_close(&file);
 
     bh_arr_push(context->loaded_files, fc);
+    u32 file_id = compilation_log_emit_file(context, bh_arr_last(context->loaded_files).filename);
 
     // if (context->options.verbose_output == 2)
     //     bh_printf("Processing source file:    %s (%d bytes)\n", file.filename, fc.length);
 
-    parse_source_file(context, &bh_arr_last(context->loaded_files));
+    parse_source_file(context, &bh_arr_last(context->loaded_files), file_id);
     return 1;
 }
 
@@ -293,7 +350,18 @@ static b32 process_load_entity(Context *context, Entity* ent) {
         );
 
         if (filename) {
-            return process_load_directory(context, include, filename);
+            bh_file_stats stats;
+            if (bh_file_stat(filename, &stats) && stats.file_type == BH_FILE_TYPE_DIRECTORY) {
+                return process_load_directory(context, include, filename);
+            }
+            return process_source_file(context, filename);
+        }
+ 
+        {
+            CompilationFileOverlay *ov = find_file_overlay(context, include->name);
+            if (ov) {
+                return process_source_file(context, ov->filename);
+            }
         }
 
         OnyxFilePos error_pos = include->token->pos;
@@ -314,6 +382,15 @@ static b32 process_load_entity(Context *context, Entity* ent) {
 
 static b32 process_entity(Context *context, Entity* ent) {
     EntityState before_state = ent->state;
+
+     if (context->options.parse_only
+         && before_state != Entity_State_Parse
+         && before_state != Entity_State_Parse_Builtin
+         && before_state != Entity_State_Error) {
+         ent->state = Entity_State_Finalized;
+         return 1;
+     }
+
     switch (before_state) {
         case Entity_State_Error:
             if (ent->type != Entity_Type_Error) {
@@ -360,7 +437,7 @@ static b32 process_entity(Context *context, Entity* ent) {
 
                 ent->state = Entity_State_Finalized;
             } else {
-                ent->macro_attempts++;
+                ent->state = Entity_State_Failed;
             }
             break;
 
@@ -374,30 +451,98 @@ static b32 process_entity(Context *context, Entity* ent) {
     return changed;
 }
 
+static b32 extensions_still_starting(Context *context) {
+    EntityHeap *eh = &context->entities;
+    for (i32 s = 0; s < Entity_State_Count; s++) {
+        if (s >= Entity_State_Code_Gen) continue;
+        if (eh->all_count[s][Entity_Type_Compiler_Extension] > 0) return 1;
+    }
+    bh_arr_each(CompilerExtension, ext, context->extensions) {
+        if (!ext->alive) continue;
+        if (ext->state == COMP_EXT_STATE_SPAWNING || ext->state == COMP_EXT_STATE_INITIATING) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static void dump_cycles(Context *context) {
     context->cycle_detected = 1;
     Entity* ent;
 
-    while (1) {
+    while (!entity_heap_empty(&context->entities)) {
         ent = entity_heap_top(&context->entities);
-        entity_heap_remove_top(&context->entities);
-        if (ent->state < Entity_State_Code_Gen) process_entity(context, ent);
-        else break;
+        if (ent->state >= Entity_State_Code_Gen) break;
 
-        if (bh_arr_length(context->entities.entities) == 0) {
-            break;
+        entity_heap_remove_top(&context->entities);
+        process_entity(context, ent);
+        if (ent->state != Entity_State_Finalized && ent->state != Entity_State_Failed) {
+            entity_heap_insert_existing(&context->entities, ent);
         }
     }
 }
 
 // TODO: relocate this function
 static void send_stalled_hooks(Context *context) {
+    // Compilation-event delivery is batched. A stall is the last chance
+    // for an extension to see every type/symbol recorded so far and
+    // inject code that resolves the missing names.
+    compiler_extensions_flush_compilation_events_now(context);
+
     bh_arr_each(CompilerExtension, ext, context->extensions) {
         compiler_extension_hook_stalled(context, ext->id);
     }
 }
 
+static b32 heap_has_pre_codegen_work(Context *context) {
+    i32 *sc = context->entities.state_count;
+    return sc[Entity_State_Parse_Builtin]
+         + sc[Entity_State_Introduce_Symbols]
+         + sc[Entity_State_Parse]
+         + sc[Entity_State_Resolve_Symbols]
+         + sc[Entity_State_Check_Types] > 0;
+}
+
+static void send_all_code_checked_hooks(Context *context) {
+    bh_arr_each(CompilerExtension, ext, context->extensions) {
+        compiler_extension_hook_all_code_checked(context, ext->id);
+    }
+}
+
+// Barrier before code generation. Compilation-event delivery stays async;
+// this is the rendezvous where extensions can inject more source
+// (`#init`, tagged procedures, …) after everything has type-checked.
+// Returns 1 if inject added compile work that must run first.
+static b32 maybe_all_code_checked_barrier(Context *context) {
+    if (context->all_code_checked_hook_done) return 0;
+    if (heap_has_pre_codegen_work(context)) return 0;
+
+    b32 any = 0;
+    bh_arr_each(CompilerExtension, ext, context->extensions) {
+        if (ext->alive && ext->supports_all_code_checked_hook) {
+            any = 1;
+            break;
+        }
+    }
+    if (!any) {
+        context->all_code_checked_hook_done = 1;
+        return 0;
+    }
+
+    send_all_code_checked_hooks(context);
+
+    if (heap_has_pre_codegen_work(context)) return 1;
+
+    context->all_code_checked_hook_done = 1;
+    return 0;
+}
+
 static void prime_pump(Context *context) {
+    if (context->options.parse_only) {
+        context->pump_is_primed = 1;
+        return;
+    }
+
     // NOTE: Add builtin entities to pipeline.
     entity_heap_insert(&context->entities, ((Entity) {
         .state = Entity_State_Parse_Builtin,
@@ -453,6 +598,8 @@ static void prime_pump(Context *context) {
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.heap_start, context->global_scope, NULL);
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_base, context->global_scope, NULL);
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_size, context->global_scope, NULL);
+    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_align, context->global_scope, NULL);
+    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_image, context->global_scope, NULL);
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.closure_base, context->global_scope, NULL);
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.stack_trace, context->global_scope, NULL);
 
@@ -463,14 +610,6 @@ static void prime_pump(Context *context) {
             .package = NULL,
             .include = create_load(context, "core:module", -1),
         }));
-    }
-
-    if (context->options.generate_symbol_info_file) {
-        context->symbol_info = bh_alloc_item(context->gp_alloc, SymbolInfoTable);
-        bh_imap_init(&context->symbol_info->node_to_id, context->gp_alloc, 512);
-        bh_arr_new(context->gp_alloc, context->symbol_info->symbols, 128);
-        bh_arr_new(context->gp_alloc, context->symbol_info->symbols_resolutions, 128);
-        sh_new_arena(context->symbol_info->files);
     }
 
     if (context->options.generate_odoc) {
@@ -484,7 +623,17 @@ static void prime_pump(Context *context) {
     context->pump_is_primed = 1;
 }
 
+static onyx_pump_t pump_return(Context *context, onyx_pump_t result) {
+    if (result == ONYX_PUMP_CONTINUE) {
+        compiler_extensions_flush_compilation_events(context);
+    } else {
+        compiler_extensions_flush_compilation_events_now(context);
+    }
+    return result;
+}
+
 onyx_pump_t onyx_pump(onyx_context_t *ctx) {
+    __library_code_entry(ctx);
     Context *context = &ctx->context;
 
     compiler_events_clear(context);
@@ -493,16 +642,50 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
         prime_pump(context);
     }
 
-    if (bh_arr_is_empty(context->entities.entities)) {
+    if (entity_heap_empty(&context->entities)) {
+        if (context->options.parse_only) {
+            return pump_return(context, ONYX_PUMP_DONE);
+        }
+
+        // Keep compilation events even when checking failed: remaining
+        // entities were already processed. Skip linking and report error.
+        if (onyx_has_errors(context)) {
+            return pump_return(context, ONYX_PUMP_ERRORED);
+        }
+
+        if (maybe_all_code_checked_barrier(context)) {
+            return pump_return(context, ONYX_PUMP_CONTINUE);
+        }
+
         // Once the module has been linked, we are all done and ready to say everything compiled successfully!
-        if (context->wasm_module_linked) return ONYX_PUMP_DONE;
+        if (context->wasm_module_linked) return pump_return(context, ONYX_PUMP_DONE);
+
+        if (context->options.emit_wasm_object) {
+            if (!context->wasm_module || !onyx_wasm_prepare_object(context->wasm_module)) {
+                return pump_return(context, ONYX_PUMP_ERRORED);
+            }
+            context->wasm_module_linked = 1;
+            return pump_return(context, ONYX_PUMP_DONE);
+        }
 
         link_wasm_module(context);
         context->wasm_module_linked = 1;
-        return ONYX_PUMP_DONE;
+        return pump_return(context, ONYX_PUMP_DONE);
     }
 
     Entity* ent = entity_heap_top(&context->entities);
+
+    if (onyx_has_errors(context) && ent->state >= Entity_State_Code_Gen) {
+        entity_heap_remove_top(&context->entities);
+        ent->state = Entity_State_Finalized;
+        return pump_return(context, ONYX_PUMP_CONTINUE);
+    }
+
+    if (!context->options.parse_only && ent->state >= Entity_State_Code_Gen) {
+        if (maybe_all_code_checked_barrier(context)) {
+            return pump_return(context, ONYX_PUMP_CONTINUE);
+        }
+    }
 
     // Mostly a preventative thing to ensure that even if somehow
     // errors were left disabled, they are re-enabled in this cycle.
@@ -540,7 +723,25 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
             if (ent->macro_attempts > context->highest_watermark) {
                 entity_heap_insert_existing(&context->entities, ent);
 
+                // The child is still negotiating. A stall now would see
+                // no registered hooks, and dump_cycles would turn every
+                // yield into a hard error before inject can run.
+                if (extensions_still_starting(context)) {
+                    context->watermarked_node = NULL;
+                    context->highest_watermark = 0;
+                    context->cycle_almost_detected = 0;
+                    return pump_return(context, ONYX_PUMP_CONTINUE);
+                }
+
                 if (context->cycle_almost_detected == 4) {
+                    // The all-types-checked event and the stalled-extension
+                    // hook already ran on earlier rungs. If a real error is
+                    // already recorded, the remaining yields are unfinished
+                    // work, not new errors. dump_cycles would promote every
+                    // one of them.
+                    if (onyx_has_errors(context)) {
+                        return pump_return(context, ONYX_PUMP_ERRORED);
+                    }
                     dump_cycles(context);
                 } else if (context->cycle_almost_detected == 3) {
                     send_stalled_hooks(context);
@@ -556,8 +757,8 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
         context->cycle_almost_detected = 0;
     }
 
-    if (onyx_has_errors(context)) {
-        return ONYX_PUMP_ERRORED;
+    if (ent->state == Entity_State_Error) {
+        ent->state = Entity_State_Failed;
     }
 
     if (ent->state != Entity_State_Finalized && ent->state != Entity_State_Failed)
@@ -571,7 +772,7 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
         context->stats.microseconds_per_state[perf_entity_state] += duration;
     }
 
-    return ONYX_PUMP_CONTINUE;
+    return pump_return(context, ONYX_PUMP_CONTINUE);
 }
 
 //
@@ -579,10 +780,12 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
 //
 
 int32_t onyx_event_count(onyx_context_t *ctx) {
+    __library_code_entry(ctx);
     return ctx->context.events.event_count;
 }
 
 onyx_event_type_t onyx_event_type(onyx_context_t *ctx, int event_idx) {
+    __library_code_entry(ctx);
     if (event_idx >= ctx->context.events.event_count) return ONYX_EVENT_UNKNOWN;
 
     CompilerEvent *ev = ctx->context.events.first;
@@ -596,6 +799,7 @@ onyx_event_type_t onyx_event_type(onyx_context_t *ctx, int event_idx) {
 }
 
 int32_t onyx_event_field_int(onyx_context_t *ctx, int event_idx, char *field) {
+    __library_code_entry(ctx);
     if (event_idx >= ctx->context.events.event_count) return 0;
 
     CompilerEvent *ev = ctx->context.events.first;
@@ -617,6 +821,7 @@ int32_t onyx_event_field_int(onyx_context_t *ctx, int event_idx, char *field) {
 }
 
 const char *onyx_event_field_str(onyx_context_t *ctx, int event_idx, char *field) {
+    __library_code_entry(ctx);
     if (event_idx >= ctx->context.events.event_count) return "";
 
     CompilerEvent *ev = ctx->context.events.first;
@@ -645,15 +850,18 @@ const char *onyx_event_field_str(onyx_context_t *ctx, int event_idx, char *field
 // Options
 //
 int32_t onyx_set_option_cstr(onyx_context_t *ctx, onyx_option_t opt, char *value) {
+    __library_code_entry(ctx);
     return onyx_set_option_bytes(ctx, opt, value, strlen(value));
 }
 
 int32_t onyx_set_option_bytes(onyx_context_t *ctx, onyx_option_t opt, char *value, int32_t length) {
+    __library_code_entry(ctx);
     if (length < 0) length = strlen(value);
     return 0;
 }
 
 int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t value) {
+    __library_code_entry(ctx);
     switch (opt) {
     case ONYX_OPTION_POST_MVP_FEATURES:      ctx->context.options.use_post_mvp_features = value; return 1;
     case ONYX_OPTION_MULTI_THREADING:        ctx->context.options.use_multi_threading = value;  return 1;
@@ -672,6 +880,9 @@ int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t valu
     case ONYX_OPTION_DISABLE_FILE_CONTENTS:  ctx->context.options.no_file_contents = value; return 1;
     case ONYX_OPTION_DISABLE_EXTENSIONS:     ctx->context.options.no_compiler_extensions = value; return 1;
     case ONYX_OPTION_PLATFORM:               ctx->context.options.runtime = value; return 1;
+    case ONYX_OPTION_PARSE_ONLY:             ctx->context.options.parse_only = value; return 1;
+    case ONYX_OPTION_JIT:                    ctx->context.options.enable_jit = value; return 1;
+    case ONYX_OPTION_EMIT_WASM_OBJECT:       ctx->context.options.emit_wasm_object = value; return 1;
 
     default:
         break;
@@ -681,6 +892,7 @@ int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t valu
 }
 
 void onyx_add_defined_var(onyx_context_t *ctx, char *variable, int32_t variable_length, char *value, int32_t value_length) {
+    __library_code_entry(ctx);
     if (variable_length < 0) variable_length = strlen(variable);
     if (value_length    < 0) value_length    = strlen(value);
 
@@ -698,11 +910,13 @@ void onyx_add_defined_var(onyx_context_t *ctx, char *variable, int32_t variable_
 /// 1. `foo:file.onyx` will search in the `foo` mapped folder.
 /// 2. `file.onyx` will search in the current directory for `file.onyx`.
 void onyx_include_file(onyx_context_t *ctx, char *filename, int32_t length) {
+    __library_code_entry(ctx);
     AstInclude* load_node = create_load(&ctx->context, filename, length);
     add_entities_for_node(&ctx->context.entities, NULL, (AstNode *) load_node, ctx->context.global_scope, NULL);
 }
 
 void onyx_add_mapped_dir(onyx_context_t *ctx, char *mapped_name, int32_t mapped_length, char *dir, int32_t dir_length) {
+    __library_code_entry(ctx);
     if (mapped_length < 0) mapped_length = strlen(mapped_name);
     if (dir_length    < 0) dir_length    = strlen(dir);
 
@@ -712,15 +926,72 @@ void onyx_add_mapped_dir(onyx_context_t *ctx, char *mapped_name, int32_t mapped_
     }));
 }
 
-/// Directly injects Onyx code as a new compilation unit
-void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length) {
-    bh_file_contents file_contents;
-    file_contents.allocator = ctx->context.ast_alloc;
-    file_contents.data = code;
-    file_contents.length = length;
-    file_contents.filename = "(injected)";
+/// Directly injects Onyx code as a new compilation unit.
+/// The source is copied onto the context heap so tokens remain valid
+/// after the caller reuses its buffer.
+void onyx_inject_code_as(onyx_context_t *ctx, char *filename, int32_t filename_length, uint8_t *code, int32_t length) {
+    __library_code_entry(ctx);
 
-    parse_source_file(&ctx->context, &file_contents);
+    if (length < 0) {
+        length = code ? (int32_t) strlen((char *) code) : 0;
+    }
+
+    bh_file_contents file_contents;
+    memset(&file_contents, 0, sizeof file_contents);
+    file_contents.allocator = ctx->context.token_alloc;
+    file_contents.data = bh_alloc(ctx->context.token_alloc, length + 1);
+    if (length > 0 && code) {
+        memcpy(file_contents.data, code, length);
+    }
+    ((char *) file_contents.data)[length] = '\0';
+    file_contents.length = length;
+
+    if (filename && filename_length != 0) {
+        if (filename_length < 0) filename_length = (int32_t) strlen(filename);
+        file_contents.filename = bh_strdup_len(ctx->context.token_alloc, filename, filename_length);
+    } else {
+        file_contents.filename = "(injected)";
+    }
+
+    bh_arr_push(ctx->context.loaded_files, file_contents);
+    u32 file_id = compilation_log_emit_file(&ctx->context, bh_arr_last(ctx->context.loaded_files).filename);
+    parse_source_file(&ctx->context, &bh_arr_last(ctx->context.loaded_files), file_id);
+    compiler_extensions_flush_compilation_events_now(&ctx->context);
+}
+
+void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length) {
+    onyx_inject_code_as(ctx, "(injected)", -1, code, length);
+}
+
+void onyx_overlay_file(onyx_context_t *ctx, char *filename, int32_t filename_length, uint8_t *code, int32_t length) {
+    __library_code_entry(ctx);
+    if (!filename) return;
+    if (filename_length < 0) filename_length = (int32_t) strlen(filename);
+    if (length < 0) length = code ? (int32_t) strlen((char *) code) : 0;
+
+    char *name = overlay_canon_name(&ctx->context, bh_strdup_len(ctx->context.gp_alloc, filename, filename_length));
+    uint8_t *data = bh_alloc(ctx->context.gp_alloc, length + 1);
+    if (length > 0 && code) memcpy(data, code, length);
+    data[length] = 0;
+
+    if (!ctx->context.file_overlays) {
+        bh_arr_new(ctx->context.gp_alloc, ctx->context.file_overlays, 4);
+    }
+
+    bh_arr_each(CompilationFileOverlay, o, ctx->context.file_overlays) {
+        if (overlay_path_match(o->filename, name)) {
+            o->filename = name;
+            o->data = data;
+            o->length = length;
+            return;
+        }
+    }
+
+    CompilationFileOverlay ov;
+    ov.filename = name;
+    ov.data = data;
+    ov.length = length;
+    bh_arr_push(ctx->context.file_overlays, ov);
 }
 
 //
@@ -728,10 +999,14 @@ void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length) {
 //
 
 int32_t onyx_error_count(onyx_context_t *ctx) {
+    __library_code_entry(ctx);
+    onyx_errors_ensure_sorted(&ctx->context);
     return bh_arr_length(ctx->context.errors.errors);
 }
 
 const char *onyx_error_message(onyx_context_t *ctx, int32_t error_idx) {
+    __library_code_entry(ctx);
+
     int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return NULL;
 
@@ -739,6 +1014,8 @@ const char *onyx_error_message(onyx_context_t *ctx, int32_t error_idx) {
 }
 
 const char *onyx_error_filename(onyx_context_t *ctx, int32_t error_idx) {
+    __library_code_entry(ctx);
+
     int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return NULL;
 
@@ -746,6 +1023,8 @@ const char *onyx_error_filename(onyx_context_t *ctx, int32_t error_idx) {
 }
 
 int32_t onyx_error_line(onyx_context_t *ctx, int32_t error_idx) {
+    __library_code_entry(ctx);
+
     int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return 0;
 
@@ -753,6 +1032,8 @@ int32_t onyx_error_line(onyx_context_t *ctx, int32_t error_idx) {
 }
 
 int32_t onyx_error_column(onyx_context_t *ctx, int32_t error_idx) {
+    __library_code_entry(ctx);
+
     int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return 0;
 
@@ -760,6 +1041,8 @@ int32_t onyx_error_column(onyx_context_t *ctx, int32_t error_idx) {
 }
 
 int32_t onyx_error_length(onyx_context_t *ctx, int32_t error_idx) {
+    __library_code_entry(ctx);
+
     int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return 0;
 
@@ -767,6 +1050,8 @@ int32_t onyx_error_length(onyx_context_t *ctx, int32_t error_idx) {
 }
 
 int32_t onyx_error_line_text(onyx_context_t *ctx, int32_t error_idx, char *line_buffer, int max_length) {
+    __library_code_entry(ctx);
+
     int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return 0;
 
@@ -786,6 +1071,8 @@ int32_t onyx_error_line_text(onyx_context_t *ctx, int32_t error_idx, char *line_
 }
 
 onyx_error_t onyx_error_rank(onyx_context_t *ctx, int32_t error_idx) {
+    __library_code_entry(ctx);
+
     int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return 0;
 
@@ -849,6 +1136,8 @@ static void ensure_injected_code_has_been_generated(onyx_context_t *ctx) {
 }
 
 int32_t onyx_output_length(onyx_context_t *ctx, onyx_output_type_t type) {
+    __library_code_entry(ctx);
+
     switch (type) {
     case ONYX_OUTPUT_TYPE_WASM:
         ensure_wasm_has_been_generated(ctx);
@@ -875,6 +1164,8 @@ int32_t onyx_output_length(onyx_context_t *ctx, onyx_output_type_t type) {
 }
 
 void onyx_output_write(onyx_context_t *ctx, onyx_output_type_t type, void *buffer) {
+    __library_code_entry(ctx);
+
     switch (type) {
     case ONYX_OUTPUT_TYPE_WASM:
         ensure_wasm_has_been_generated(ctx);
@@ -904,11 +1195,34 @@ void onyx_output_write(onyx_context_t *ctx, onyx_output_type_t type, void *buffe
 }
 
 
+int32_t onyx_compilation_events_length(onyx_context_t *ctx) {
+    __library_code_entry(ctx);
+    compilation_log_ensure_c_abi_encoded(&ctx->context);
+    return ctx->context.compilation_log.encoded.length;
+}
+
+void onyx_compilation_events_write(onyx_context_t *ctx, void *buffer) {
+    __library_code_entry(ctx);
+    CompilationLog *log = &ctx->context.compilation_log;
+    compilation_log_ensure_c_abi_encoded(&ctx->context);
+
+    if (log->encoded.length > 0 && buffer) {
+        memcpy(buffer, log->encoded.data, log->encoded.length);
+    }
+
+    log->c_abi_cursor = log->encoded_to;
+    if (log->c_abi_cursor > log->delivered_until) log->delivered_until = log->c_abi_cursor;
+    log->encoded_valid = 0;
+}
+
+
 //
 // Compilation Info
 //
 
 int64_t onyx_stat(onyx_context_t *ctx, onyx_stat_t stat) {
+    __library_code_entry(ctx);
+
     switch (stat) {
         case ONYX_STAT_FILE_COUNT:  return bh_arr_length(ctx->context.loaded_files);
         case ONYX_STAT_LINE_COUNT:  return ctx->context.stats.lexer_lines_processed;
@@ -918,6 +1232,8 @@ int64_t onyx_stat(onyx_context_t *ctx, onyx_stat_t stat) {
 }
 
 const char *onyx_stat_filepath(onyx_context_t *ctx, int32_t file_index) {
+    __library_code_entry(ctx);
+
     if (file_index < 0 || file_index >= bh_arr_length(ctx->context.loaded_files)) {
         return NULL;
     }
@@ -932,8 +1248,8 @@ const char *onyx_stat_filepath(onyx_context_t *ctx, int32_t file_index) {
 //
 
 #ifdef ONYX_RUNTIME_LIBRARY
-void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv) {
-    onyx_run_initialize(0, NULL);
+void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv, int32_t jit_enabled) {
+    onyx_run_initialize(0, NULL, jit_enabled);
 
     bh_buffer wasm_bytes;
     wasm_bytes.data = buffer;
@@ -942,8 +1258,8 @@ void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv) {
     onyx_run_wasm_code(wasm_bytes, argc, argv);
 }
 
-void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path) {
-    onyx_run_initialize(1, socket_path);
+void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path, int32_t jit_enabled) {
+    onyx_run_initialize(1, socket_path, jit_enabled);
 
     bh_buffer wasm_bytes;
     wasm_bytes.data = buffer;
@@ -952,11 +1268,13 @@ void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, cha
     onyx_run_wasm_code(wasm_bytes, argc, argv);
 }
 #else
-void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv) {
+void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv, int32_t jit_enabled) {
+    (void) jit_enabled;
     printf("ERROR: Cannot run WASM code. No runtime was configured at the time Onyx was built\n");
 }
 
-void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path) {
+void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path, int32_t jit_enabled) {
+    (void) jit_enabled;
     printf("ERROR: Cannot run WASM code. No runtime was configured at the time Onyx was built\n");
 }
 #endif
@@ -966,12 +1284,15 @@ void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, cha
 // Internal procedures
 
 static AstInclude* create_load(Context *context, char* filename, int32_t length) {
-    static OnyxToken implicit_load_token = { '#', 1, 0, { 0, 0, 0, 0, 0 } };
-    
+    OnyxToken *implicit_load_token = bh_alloc_item(context->ast_alloc, OnyxToken);
+    memset(implicit_load_token, 0, sizeof *implicit_load_token);
+    implicit_load_token->type = '#';
+    implicit_load_token->length = 1;
+
     AstInclude* include_node = onyx_ast_node_new(context->ast_alloc, sizeof(AstInclude), Ast_Kind_Load);
     include_node->name = bh_strdup_len(context->ast_alloc, filename, length);
     bh_path_convert_separators(include_node->name);
-    include_node->token = &implicit_load_token;
+    include_node->token = implicit_load_token;
 
     return include_node;
 }
@@ -1019,4 +1340,8 @@ static void link_wasm_module(Context *context) {
     assert(onyx_wasm_build_link_options_from_node(context, &link_opts, link_options_node));
 
     onyx_wasm_module_link(context, context->wasm_module, &link_opts);
+}
+
+static void __library_code_entry(onyx_context_t *ctx) {
+    stbds_heap_allocator = ctx ? (void *) ctx->context.stbds_alloc : (void *) 0;
 }

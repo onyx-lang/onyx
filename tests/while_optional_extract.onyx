@@ -1,0 +1,37 @@
+use core {*}
+
+main :: () {
+    m := Map.literal(str, u32, .[
+        .{"foo", 10},
+        .{"bar", 20},
+        .{"qux", 30},
+    ])
+
+    map_it := Iterator.from(&m)
+    defer Iterator.close(map_it)
+
+    while Iterator.next(map_it) as entry {
+        printf("{}: {}\n", entry.key, entry.value)
+    }
+
+
+
+    counter :: (start, end: $T, incr: T = 1) -> () -> ? T {
+        value := start
+        return () use () -> ? T {
+            if value >= end do return .None
+            defer value += incr
+            return value
+        }
+    }
+
+    c_it := counter(0, 10, 2)
+    while c_it() as v {
+        println(v)
+    }
+
+    c2_it := counter(5.0, 8.0)
+    while c2_it() as v {
+        println(v)
+    }
+}

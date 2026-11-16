@@ -1,0 +1,71 @@
+use core {*}
+use core.alloc.arena { Arena }
+use core.alloc.pool { PoolAllocator }
+use core.alloc.fixed { FixedAllocator }
+use core.alloc.ring { RingState }
+use core.alloc.gc { GCState }
+
+// @leak-check
+
+main :: () {
+    {
+        use a := Arena.make(context.allocator, 1024);
+        aa := a->as_allocator();
+        p := cast(&i32) raw_alloc(aa, sizeof i32);
+        *p = 42;
+        println(*p);
+        a->clear();
+        println(a->get_allocated_arenas());
+    }
+
+    {
+        buf := make([] i32, 4);
+        defer delete(&buf);
+        pool := PoolAllocator.make(buf);
+        e := pool->alloc();
+        *e = 7;
+        println(*e);
+        pool->free(e);
+        pool->clear();
+        e2 := pool->alloc();
+        *e2 = 8;
+        println(*e2);
+        delete(&pool);
+    }
+
+    {
+        mem := make([] u8, 64);
+        defer delete(&mem);
+        f := FixedAllocator.make(mem);
+        fa := f->as_allocator();
+        p := cast(&i32) raw_alloc(fa, sizeof i32);
+        *p = 9;
+        println(*p);
+        f->clear();
+        delete(&f);
+    }
+
+    {
+        mem := make([] u8, 64);
+        defer delete(&mem);
+        r := RingState.make(mem);
+        ra := r->as_allocator();
+        p := cast(&i32) raw_alloc(ra, sizeof i32);
+        *p = 3;
+        println(*p);
+        r->clear();
+        delete(&r);
+    }
+
+    {
+        use g := GCState.make();
+        old := context.allocator;
+        context.allocator = g->as_allocator();
+        q := new(i32);
+        *q = 11;
+        println(*q);
+        context.allocator = old;
+    }
+
+    println("ok");
+}

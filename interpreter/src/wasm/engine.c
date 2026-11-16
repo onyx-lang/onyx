@@ -1,5 +1,6 @@
 
 #include "ovm_wasm.h"
+#include "ovm_jit.h"
 #include "vm.h"
 
 wasm_engine_t *wasm_engine_new() {
@@ -16,6 +17,10 @@ wasm_engine_t *wasm_engine_new_with_config(wasm_config_t *config) {
     
     ovm_engine_t *ovm_engine = ovm_engine_new(store);
     engine->engine = ovm_engine;
+
+    if (config && config->jit_enabled) {
+        ovm_engine_set_jit_enabled(engine->engine, 1);
+    }
 
     if (config && config->debug_enabled) {
         // This should maybe be moved elsewhere?

@@ -1,0 +1,38 @@
+#load "core:onyx/toolchain/module"
+
+use core {*}
+use onyx.toolchain {*}
+
+Compile_Out :: struct {
+    ok: bool
+}
+
+compile_job :: (out: &Compile_Out) {
+    b := Builder.make();
+    defer b->destroy();
+
+    core_root := os.env("ONYX_PATH") ?? "";
+    defer str.free(core_root);
+    b->map_dir("core", tprintf("{}/core", core_root));
+
+    b->enable(.DISABLE_EXTENSIONS);
+    b->enable(.MULTI_THREADING);
+    b->set_platform(.ONYX);
+    b->inject_source_as("t.onyx", "package main\nmain :: () {}\n");
+    b->compile();
+    out.ok = !b->has_errors();
+}
+
+main :: () {
+    r1: Compile_Out;
+    r2: Compile_Out;
+    t1: thread.Thread;
+    t2: thread.Thread;
+    thread.spawn(&t1, &r1, compile_job);
+    thread.spawn(&t2, &r2, compile_job);
+    thread.join(&t1);
+    thread.join(&t2);
+
+    println("both_ok");
+    println(r1.ok && r2.ok);
+}

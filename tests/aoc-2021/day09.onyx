@@ -3,7 +3,7 @@
 use core {*}
 
 Pos :: struct {x,y: i32;}
-#match hash.to_u32 (use p: Pos) => x * 13 & 17 * y;
+#match hash.hash (use p: Pos) => x * 13 & 17 * y;
 #operator == (p1, p2: Pos) => p1.x == p2.x && p1.y == p2.y;
 
 Cell :: struct {
@@ -21,14 +21,14 @@ find_span :: macro (low: Pos) -> u32 {
 
     while queued.count != 0 {
         t := queued[0];
-        array.delete(&queued, 0);
+        Array.remove_at(&queued, 0);
 
         top := &heightmap[t];
         if top.height == 9 do continue;
 
         included << t;
 
-        array.clear(&potential);
+        Array.clear(&potential);
         if t.x < width - 1 && top.dx < 0 {
             potential << Pos.{t.x+1,t.y};
         }
@@ -47,7 +47,7 @@ find_span :: macro (low: Pos) -> u32 {
         }
 
         for p in potential {
-            if !array.contains(included, p) && !array.contains(queued, p) {
+            if !Slice.contains(included, p) && !Slice.contains(queued, p) {
                 queued << p;
             }
         }
@@ -56,24 +56,24 @@ find_span :: macro (low: Pos) -> u32 {
     return included.count;
 }
 
-#match io.write (w: &io.Writer, x: &Map($K, $V)) {
-    io.write(w, "{\n");
+#match io.Writer.write (w: &io.Writer, x: &Map($K, $V)) {
+    io.Writer.write(w, "{\n");
     for e in x.entries {
-        io.write(w, "    {} => {}\n", e.key, e.value);
+        io.Writer.write(w, "    {} => {}\n", e.key, e.value);
     }
-    io.write(w, "}");
+    io.Writer.write(w, "}");
 }
 
 main :: (args) => {
-    use file := os.open("./tests/aoc-2021/input/day09.txt")->unwrap();
-    use reader := io.reader_make(&file);
+    use file := os.File.open("./tests/aoc-2021/input/day09.txt")->unwrap();
+    use reader := io.Reader.make(&file);
 
     heightmap: Map(Pos, Cell);
 
     height, width := 0, 0;
-    while !io.reader_empty(&reader) {
-        line := io.read_line(&reader, consume_newline=false, inplace=true);
-        io.skip_whitespace(&reader);
+    while !io.Reader.empty(&reader) {
+        line := io.Reader.read_line(&reader, consume_newline=false, inplace=true);
+        io.Reader.skip_whitespace(&reader);
 
         for line.count {
             heightmap[Pos.{it, height}] = Cell.{cast(u32) (line[it] - '0')};
@@ -84,12 +84,12 @@ main :: (args) => {
     }
 
     for y in height - 1 do for x in width {
-        map.update(&heightmap, .{x,y}) {
+        map.Map.update(&heightmap, .{x,y}) {
             it.dy = it.height - heightmap[Pos.{x,y+1}]->unwrap().height;
         }
     }
     for x in width - 1 do for y in height {
-        map.update(&heightmap, .{x,y}) {
+        map.Map.update(&heightmap, .{x,y}) {
             it.dx = it.height - heightmap[Pos.{x+1,y}]->unwrap().height;
         }
     }
@@ -118,7 +118,7 @@ main :: (args) => {
     lowest_count: Map(Pos, i32);
     for low in lowest do lowest_count[low] = find_span(low);
 
-    array.quicksort(lowest_count.entries, (a, b) => b.value - a.value);
+    Slice.quicksort(lowest_count.entries, (a, b) => b.value - a.value);
 
     answer := iter.as_iter(lowest_count.entries)
            |> iter.map((x) => x.value)

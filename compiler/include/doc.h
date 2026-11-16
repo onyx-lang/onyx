@@ -32,22 +32,6 @@ struct SymbolResolution {
 	u32 symbol_id;
 };
 
-typedef struct SymbolInfoTable SymbolInfoTable;
-struct SymbolInfoTable {
-	// File name -> file id
-	Table(u32) files;
-	u32 next_file_id;
-
-	// Symbol id -> symbol info
-	bh_arr(SymbolInfo) symbols;
-	u32 next_symbol_id;
-
-	bh_arr(SymbolResolution) symbols_resolutions;
-
-	// Node * -> symbol_id
-	bh_imap node_to_id;
-};
-
 void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer);
 
 #endif

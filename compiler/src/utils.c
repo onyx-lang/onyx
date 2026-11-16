@@ -5,7 +5,6 @@
 #include "parser.h"
 #include "astnodes.h"
 #include "errors.h"
-#include "doc.h"
 #include "onyx.h"
 
 //
@@ -38,6 +37,15 @@ Package* package_lookup_or_create(Context *context, char* package_name, Scope* p
         package->use_package_entities = NULL;
         package->id = ++context->next_package_id;
         package->parent_id = -1;
+
+        char *dot = strrchr(pac_name, '.');
+        if (dot != NULL) {
+            *dot = '\0';
+            Package *parent = package_lookup(context, pac_name);
+            *dot = '.';
+            if (parent) package->parent_id = parent->id;
+        }
+
         bh_arr_new(context->gp_alloc, package->sub_packages, 4);
 
         if (!strcmp(pac_name, "builtin")) {
@@ -47,6 +55,11 @@ Package* package_lookup_or_create(Context *context, char* package_name, Scope* p
             package->scope = scope_create(context, parent_scope, pos);
             package->private_scope = scope_create(context, package->scope, pos);
         }
+
+        // Public scope's parent is often the global scope, which belongs to
+        // builtin. Stamp both package scopes so symbol lookup stops here.
+        if (package->scope) package->scope->package = package;
+        if (package->private_scope) package->private_scope->package = package;
 
         shput(context->packages, pac_name, package);
 
@@ -61,6 +74,8 @@ Package* package_lookup_or_create(Context *context, char* package_name, Scope* p
 
             symbol_raw_introduce(context, context->global_scope, pac_name, pos, (AstNode *) package_node);
         }
+
+        compilation_log_emit_package(context, package);
 
         return package;
     }
@@ -104,49 +119,108 @@ void package_mark_as_used(Context *context, Package* package) {
 
 
 //
+// Atom table
+//
+
+void atom_table_init(Context *context) {
+    sh_new_arena(context->atom_by_name);
+    bh_arr_new(context->gp_alloc, context->atom_names, 256);
+    bh_arr_push(context->atom_names, (char *) "");
+    context->atom_underscore = atom_intern(context, "_");
+}
+
+u32 atom_intern(Context *context, const char *name) {
+    if (!name || !name[0]) return 0;
+    if (context->atom_cache_ptr == name) return context->atom_cache_id;
+
+    i32 idx = shgeti(context->atom_by_name, (char *) name);
+    if (idx >= 0) {
+        context->atom_cache_ptr = name;
+        context->atom_cache_id = context->atom_by_name[idx].value;
+        return context->atom_cache_id;
+    }
+
+    u32 id = (u32) bh_arr_length(context->atom_names);
+    shput(context->atom_by_name, (char *) name, id);
+    idx = shgeti(context->atom_by_name, (char *) name);
+    bh_arr_push(context->atom_names, context->atom_by_name[idx].key);
+    context->atom_cache_ptr = name;
+    context->atom_cache_id = id;
+    return id;
+}
+
+const char *atom_name(Context *context, u32 atom) {
+    if (atom >= (u32) bh_arr_length(context->atom_names)) return "";
+    char *name = context->atom_names[atom];
+    return name ? name : "";
+}
+
+u32 token_atom(Context *context, OnyxToken *tkn) {
+    if (!tkn) return 0;
+
+    token_toggle_end(tkn);
+    // A token may carry an atom id from another table (or a stale
+    // cache). Only reuse it if this context still maps that id to
+    // the same name.
+    if (tkn->atom) {
+        const char *n = atom_name(context, tkn->atom);
+        if (n[0] && !strcmp(n, tkn->text)) {
+            token_toggle_end(tkn);
+            return tkn->atom;
+        }
+    }
+
+    tkn->atom = atom_intern(context, tkn->text);
+    token_toggle_end(tkn);
+    return tkn->atom;
+}
+
+//
 // Scoping
 //
 
-Scope* scope_create(Context *context, Scope* parent, OnyxFilePos created_at) {
-    Scope* scope = bh_alloc_item(context->ast_alloc, Scope);
-
-    scope->id = ++context->next_scope_id;
-    scope->parent = parent;
-    scope->created_at = created_at;
-    scope->name = NULL;
-
-    // This will be set on the first symbol insertion.
-    scope->symbols = NULL;
-
-    return scope;
+static void scope_symbols_init(Context *context, Scope *scope) {
+    if (scope->symbols.hashes) return;
+    bh_imap_init(&scope->symbols, context->gp_alloc, 16);
 }
 
-void scope_include(Context *context, Scope* target, Scope* source, OnyxFilePos pos) {
-    fori (i, 0, shlen(source->symbols)) {
-        symbol_raw_introduce(context, target, source->symbols[i].key, pos, source->symbols[i].value);
+static AstNode *symbol_resolve_atom_no_ascend(Scope *scope, u32 atom) {
+    if (!scope || !atom || !scope->symbols.hashes) return NULL;
+
+    bh_imap_entry_t value = 0;
+    if (!bh_imap_try_get(&scope->symbols, (bh_imap_entry_t) atom, &value)) return NULL;
+
+    AstNode *res = (AstNode *) value;
+    if (res && (res->flags & Ast_Flag_Symbol_Invisible) == 0) {
+        return res;
     }
+    return NULL;
 }
 
-b32 symbol_introduce(Context *context, Scope* scope, OnyxToken* tkn, AstNode* symbol) {
-    token_toggle_end(tkn);
+static AstNode *symbol_resolve_atom(Scope *start_scope, u32 atom, i32 limit) {
+    if (!atom) return NULL;
 
-    b32 ret = symbol_raw_introduce(context, scope, tkn->text, tkn->pos, symbol);
-
-    token_toggle_end(tkn);
-    return ret;
-}
-
-b32 symbol_raw_introduce(Context *context, Scope* scope, char* name, OnyxFilePos pos, AstNode* symbol) {
-    if (!scope->symbols) {
-        sh_new_arena(scope->symbols);
+    Scope *scope = start_scope;
+    i32 depth = 0;
+    while (scope != NULL && depth++ < limit) {
+        AstNode *res = symbol_resolve_atom_no_ascend(scope, atom);
+        if (res) return res;
+        scope = scope->parent;
     }
+    return NULL;
+}
 
-    if (strcmp(name, "_")) {
-        i32 index = shgeti(scope->symbols, name);
-        if (index != -1) {
-            AstNode *node = scope->symbols[index].value;
+static b32 symbol_introduce_atom(Context *context, Scope *scope, u32 atom, OnyxFilePos pos, AstNode *symbol) {
+    if (!atom) return 1;
+
+    scope_symbols_init(context, scope);
+
+    if (atom != context->atom_underscore) {
+        bh_imap_entry_t existing = 0;
+        if (bh_imap_try_get(&scope->symbols, (bh_imap_entry_t) atom, &existing)) {
+            AstNode *node = (AstNode *) existing;
             if (node != symbol) {
-                ONYX_ERROR(pos, Error_Critical, "Redeclaration of symbol '%s'.", name);
+                ONYX_ERROR(pos, Error_Critical, "Redeclaration of symbol '%s'.", atom_name(context, atom));
 
                 if (node->token) {
                     ONYX_ERROR(node->token->pos, Error_Critical, "Previous declaration was here.");
@@ -158,30 +232,63 @@ b32 symbol_raw_introduce(Context *context, Scope* scope, char* name, OnyxFilePos
         }
     }
 
-    shput(scope->symbols, name, symbol);
-    track_declaration_for_symbol_info(context, pos, symbol);
+    bh_imap_put(&scope->symbols, (bh_imap_entry_t) atom, (bh_imap_entry_t) symbol);
+    compilation_log_emit_symbol(context, scope, (char *) atom_name(context, atom), pos, symbol);
     return 1;
 }
 
-void symbol_builtin_introduce(Context *context, Scope* scope, char* sym, AstNode *node) {
-    if (!scope->symbols) sh_new_arena(scope->symbols);
+Scope* scope_create(Context *context, Scope* parent, OnyxFilePos created_at) {
+    Scope* scope = bh_alloc_item(context->ast_alloc, Scope);
+    memset(scope, 0, sizeof(*scope));
 
-    shput(scope->symbols, sym, node);
+    scope->id = ++context->next_scope_id;
+    scope->parent = parent;
+    scope->created_at = created_at;
+
+    compilation_log_emit_scope(context, scope);
+
+    return scope;
+}
+
+void scope_include(Context *context, Scope* target, Scope* source, OnyxFilePos pos) {
+    i32 n = scope_symbol_count(source);
+    fori (i, 0, n) {
+        symbol_introduce_atom(context, target, scope_symbol_atom_at(source, i), pos, scope_symbol_at(source, i));
+    }
+}
+
+b32 symbol_introduce(Context *context, Scope* scope, OnyxToken* tkn, AstNode* symbol) {
+    return symbol_introduce_atom(context, scope, token_atom(context, tkn), tkn->pos, symbol);
+}
+
+b32 symbol_raw_introduce(Context *context, Scope* scope, char* name, OnyxFilePos pos, AstNode* symbol) {
+    return symbol_introduce_atom(context, scope, atom_intern(context, name), pos, symbol);
+}
+
+void symbol_builtin_introduce(Context *context, Scope* scope, char* sym, AstNode *node) {
+    u32 atom = atom_intern(context, sym);
+    if (!atom) return;
+
+    scope_symbols_init(context, scope);
+    bh_imap_put(&scope->symbols, (bh_imap_entry_t) atom, (bh_imap_entry_t) node);
 }
 
 void symbol_subpackage_introduce(Context *context, Package* parent, char* sym, AstPackage* subpackage) {
     Scope *scope = parent->scope;
-    if (!scope->symbols) sh_new_arena(scope->symbols);
+    u32 atom = atom_intern(context, sym);
+    if (!atom) return;
 
-    i32 index = shgeti(scope->symbols, sym);
-    if (index != -1) {
-        AstNode* maybe_package = scope->symbols[index].value;
-        
+    scope_symbols_init(context, scope);
+
+    bh_imap_entry_t existing = 0;
+    if (bh_imap_try_get(&scope->symbols, (bh_imap_entry_t) atom, &existing)) {
+        AstNode* maybe_package = (AstNode *) existing;
+
         // CLEANUP: Make this assertion an actual error message.
         assert(maybe_package->kind == Ast_Kind_Package);
 
     } else {
-        shput(scope->symbols, sym, (AstNode *) subpackage);
+        bh_imap_put(&scope->symbols, (bh_imap_entry_t) atom, (bh_imap_entry_t) subpackage);
 
         // Parent: parent->id
         // Child:  subpackage->package->id
@@ -190,58 +297,19 @@ void symbol_subpackage_introduce(Context *context, Package* parent, char* sym, A
 }
 
 AstNode* symbol_raw_resolve_no_ascend(Context *context, Scope* scope, char* sym) {
-    if (!scope || !scope->symbols) return NULL;
-
-    i32 index = shgeti(scope->symbols, sym);
-    if (index != -1) {
-        AstNode* res = scope->symbols[index].value;
-
-        if ((res->flags & Ast_Flag_Symbol_Invisible) == 0) {
-            return res;
-        }
-    }
-
-    return NULL;
+    return symbol_resolve_atom_no_ascend(scope, atom_intern(context, sym));
 }
 
 AstNode* symbol_raw_resolve_limited(Context *context, Scope* start_scope, char* sym, i32 limit) {
-    Scope* scope = start_scope;
-    AstNode *res = NULL;
-
-    while (scope != NULL && limit-- > 0) {
-        res = symbol_raw_resolve_no_ascend(context, scope, sym);
-        if (res) {
-            return res;
-        }
-
-        scope = scope->parent;
-    }
-
-    return NULL;
+    return symbol_resolve_atom(start_scope, atom_intern(context, sym), limit);
 }
 
 AstNode* symbol_raw_resolve(Context *context, Scope* start_scope, char* sym) {
-    Scope* scope = start_scope;
-    AstNode *res = NULL;
-
-    while (scope != NULL) {
-        res = symbol_raw_resolve_no_ascend(context, scope, sym);
-        if (res) {
-            return res;
-        }
-
-        scope = scope->parent;
-    }
-
-    return NULL;
+    return symbol_resolve_atom(start_scope, atom_intern(context, sym), 256);
 }
 
 AstNode* symbol_resolve(Context *context, Scope* start_scope, OnyxToken* tkn) {
-    token_toggle_end(tkn);
-    AstNode* res = symbol_raw_resolve(context, start_scope, tkn->text);
-    token_toggle_end(tkn);
-
-    return res;
+    return symbol_resolve_atom(start_scope, token_atom(context, tkn), 256);
 }
 
 AstNode* try_symbol_raw_resolve_from_node(Context *context, AstNode* node, char* symbol) {
@@ -249,10 +317,13 @@ AstNode* try_symbol_raw_resolve_from_node(Context *context, AstNode* node, char*
     // There are some additional cases handled here, but I think the majority
     // of this code could be rewritten in terms of get_scope_from_node.
 
+    u32 atom = atom_intern(context, symbol);
     b32 used_pointer = 0;
+    i32 peel_depth = 0;
 
     while (1) {
         if (!node) return NULL;
+        if (++peel_depth > 64) return NULL;
 
         switch (node->kind) {
             case Ast_Kind_Type_Raw_Alias: node = (AstNode *) ((AstTypeRawAlias *) node)->to->ast_type; break;
@@ -286,17 +357,18 @@ all_types_peeled_off:
                 return NULL;
             }
 
-            return symbol_raw_resolve_no_ascend(context, package->package->scope, symbol);
+            return symbol_resolve_atom_no_ascend(package->package->scope, atom);
         } 
 
         case Ast_Kind_Foreign_Block:
+        case Ast_Kind_Object_Block:
         case Ast_Kind_Basic_Type:
         case Ast_Kind_Enum_Type:
         case Ast_Kind_Poly_Union_Type:
         case Ast_Kind_Distinct_Type:
         case Ast_Kind_Interface: {
             Scope* scope = get_scope_from_node(context, node);
-            return symbol_raw_resolve_no_ascend(context, scope, symbol);
+            return symbol_resolve_atom_no_ascend(scope, atom);
         }
 
         case Ast_Kind_Slice_Type:
@@ -306,7 +378,7 @@ all_types_peeled_off:
             if (!scope)
                 return NULL;
 
-            return symbol_raw_resolve(context, scope, symbol);
+            return symbol_resolve_atom(scope, atom, 256);
         }
 
         case Ast_Kind_Struct_Type: {
@@ -322,7 +394,7 @@ all_types_peeled_off:
             }
 
             if (result == NULL && stype->scope) {
-                result = symbol_raw_resolve_no_ascend(context, stype->scope, symbol);
+                result = symbol_resolve_atom_no_ascend(stype->scope, atom);
             }
 
             return result;
@@ -337,7 +409,7 @@ all_types_peeled_off:
             }
 
             if (result == NULL && utype->scope) {
-                result = symbol_raw_resolve_no_ascend(context, utype->scope, symbol);
+                result = symbol_resolve_atom_no_ascend(utype->scope, atom);
             }
 
             return result;
@@ -352,10 +424,10 @@ all_types_peeled_off:
                 // forcing the use the Slice functions, but then it can
                 // get confusing about where every function lives, ya know.
                 // Is "get" in Array or Slice.
-                return symbol_raw_resolve_limited(context, stype->scope, symbol, 2);
+                return symbol_resolve_atom(stype->scope, atom, 2);
 
             } else {
-                return symbol_raw_resolve_no_ascend(context, stype->scope, symbol);
+                return symbol_resolve_atom_no_ascend(stype->scope, atom);
             }
         }
 
@@ -404,11 +476,8 @@ all_types_peeled_off:
 }
 
 AstNode* try_symbol_resolve_from_node(Context *context, AstNode* node, OnyxToken* token) {
-    token_toggle_end(token);
-    AstNode* result = try_symbol_raw_resolve_from_node(context, node, token->text);
-    token_toggle_end(token);
-
-    return result;
+    u32 atom = token_atom(context, token);
+    return try_symbol_raw_resolve_from_node(context, node, (char *) atom_name(context, atom));
 }
 
 static AstNode* try_symbol_raw_resolve_from_poly_sln(Context *context, bh_arr(AstPolySolution) slns, char *symbol) {
@@ -432,25 +501,28 @@ static AstNode* try_symbol_raw_resolve_from_poly_sln(Context *context, bh_arr(As
 }
 
 AstNode* try_symbol_raw_resolve_from_type(Context *context, Type *type, char* symbol) {
-    while (type->kind == Type_Kind_Pointer) {
+    u32 atom = atom_intern(context, symbol);
+    i32 ptr_depth = 0;
+    while (type && type->kind == Type_Kind_Pointer && ptr_depth++ < 64) {
         type = type->Pointer.elem; 
     }
+    if (!type) return NULL;
 
     switch (type->kind) {
         case Type_Kind_Basic: {
-            return symbol_raw_resolve_no_ascend(context, ((AstBasicType *) type->ast_type)->scope, symbol);
+            return symbol_resolve_atom_no_ascend(((AstBasicType *) type->ast_type)->scope, atom);
         }
 
         case Type_Kind_Enum: {
-            return symbol_raw_resolve_no_ascend(context, ((AstEnumType *) type->ast_type)->scope, symbol);
+            return symbol_resolve_atom_no_ascend(((AstEnumType *) type->ast_type)->scope, atom);
         }
 
         case Type_Kind_Slice: {
-            return symbol_raw_resolve(context, type->Slice.scope, symbol);
+            return symbol_resolve_atom(type->Slice.scope, atom, 256);
         }
 
         case Type_Kind_DynArray: {
-            return symbol_raw_resolve(context, type->DynArray.scope, symbol);
+            return symbol_resolve_atom(type->DynArray.scope, atom, 256);
         }
 
         case Type_Kind_Struct: {
@@ -463,7 +535,7 @@ AstNode* try_symbol_raw_resolve_from_type(Context *context, Type *type, char* sy
                 limit = 3;
             }
 
-            return symbol_raw_resolve_limited(context, type->Struct.scope, symbol, limit);
+            return symbol_resolve_atom(type->Struct.scope, atom, limit);
         }
 
         case Type_Kind_Union: {
@@ -480,19 +552,19 @@ AstNode* try_symbol_raw_resolve_from_type(Context *context, Type *type, char* sy
                 limit = 3;
             }
 
-            return symbol_raw_resolve_limited(context, type->Union.scope, symbol, limit);
+            return symbol_resolve_atom(type->Union.scope, atom, limit);
         }
 
         case Type_Kind_PolyStruct: {
-            return symbol_raw_resolve_no_ascend(context, type->PolyStruct.scope, symbol);
+            return symbol_resolve_atom_no_ascend(type->PolyStruct.scope, atom);
         }
 
         case Type_Kind_PolyUnion: {
-            return symbol_raw_resolve_no_ascend(context, type->PolyUnion.scope, symbol);
+            return symbol_resolve_atom_no_ascend(type->PolyUnion.scope, atom);
         }
 
         case Type_Kind_Distinct: {
-            return symbol_raw_resolve(context, type->Distinct.scope, symbol);
+            return symbol_resolve_atom(type->Distinct.scope, atom, 256);
         }
 
         default: return NULL;
@@ -502,15 +574,12 @@ AstNode* try_symbol_raw_resolve_from_type(Context *context, Type *type, char* sy
 }
 
 AstNode* try_symbol_resolve_from_type(Context *context, Type *type, OnyxToken *token) {
-    token_toggle_end(token);
-    AstNode* result = try_symbol_raw_resolve_from_type(context, type, token->text);
-    token_toggle_end(token);
-
-    return result;
+    u32 atom = token_atom(context, token);
+    return try_symbol_raw_resolve_from_type(context, type, (char *) atom_name(context, atom));
 }
 
 void scope_clear(Scope* scope) {
-    sh_new_arena(scope->symbols);
+    if (scope->symbols.hashes) bh_imap_clear(&scope->symbols);
 }
 
 // Polymorphic procedures are in their own file to clean up this file.
@@ -543,7 +612,9 @@ void scope_clear(Scope* scope) {
 //  * Resolving an overload from a TypeFunction (so an overloaded procedure can be passed as a parameter)
 //
 
-void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 order, AstTyped* overload) {
+void add_overload_option(Context *context, bh_arr(OverloadOption)* poverloads, u64 order, AstTyped* overload) {
+    context->overload_cache_epoch++;
+
     bh_arr(OverloadOption) overloads = *poverloads;
 
     i32 index = -1;
@@ -589,38 +660,68 @@ void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 order, AstTyped
 // collect all the overloads into the map, and also use the map to provide a base case.
 void build_all_overload_options(bh_arr(OverloadOption) overloads, bh_imap* all_overloads) {
     bh_arr_each(OverloadOption, overload, overloads) {
-        if (bh_imap_has(all_overloads, (u64) overload->option)) continue;
+        if (!bh_imap_put_if_absent(all_overloads, (u64) overload->option, 1)) continue;
 
-        bh_imap_put(all_overloads, (u64) overload->option, 1);
-
-        if (overload->option->kind == Ast_Kind_Overloaded_Function) {
-            AstOverloadedFunction* sub_overload = (AstOverloadedFunction *) overload->option;
+        AstNode *option = strip_aliases((AstNode *) overload->option);
+        if (option && option->kind == Ast_Kind_Overloaded_Function) {
+            AstOverloadedFunction* sub_overload = (AstOverloadedFunction *) option;
             build_all_overload_options(sub_overload->overloads, all_overloads);
         }
     }
 }
 
-AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadOption) overloads, Arguments* param_args) {
+bh_imap *overload_cache_get(Context *context, bh_arr(OverloadOption) overloads, OverloadCache *cache) {
+    if (cache && cache->map.hashes && cache->epoch == context->overload_cache_epoch) {
+        return &cache->map;
+    }
+
+    if (cache) {
+        if (cache->map.hashes) {
+            bh_imap_clear(&cache->map);
+        } else {
+            i32 n = bh_arr_length(overloads) * 2;
+            if (n < 4) n = 4;
+            bh_imap_init(&cache->map, context->gp_alloc, n);
+        }
+        build_all_overload_options(overloads, &cache->map);
+        cache->epoch = context->overload_cache_epoch;
+        return &cache->map;
+    }
+
+    return NULL;
+}
+
+AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadOption) overloads, Arguments* param_args, OverloadCache *cache) {
     Arguments args;
     arguments_clone(context, &args, param_args);
     arguments_ensure_length(context, &args, bh_arr_length(args.values) + bh_arr_length(args.named_values));
 
-    // CLEANUP SPEED: This currently rebuilds the complete set of overloads every time one is looked up.
-    // This should be cached in the AstOverloadedFunction or somewhere like that.
-    bh_imap all_overloads;
-    bh_imap_init(&all_overloads, context->gp_alloc, bh_arr_length(overloads) * 2);
-    build_all_overload_options(overloads, &all_overloads);
+    bh_imap local_overloads;
+    bh_imap *all_overloads = overload_cache_get(context, overloads, cache);
+    b32 local = 0;
+    if (!all_overloads) {
+        bh_imap_init(&local_overloads, context->gp_alloc, bh_arr_length(overloads) * 2);
+        build_all_overload_options(overloads, &local_overloads);
+        all_overloads = &local_overloads;
+        local = 1;
+    }
 
     AstTyped *matched_overload = NULL;
 
-    bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
+    bh_arr_each(bh__imap_entry, entry, all_overloads->entries) {
         AstTyped* node = (AstTyped *) strip_aliases((AstNode *) entry->key);
         arguments_copy(context, &args, param_args);
 
         AstFunction* overload = NULL;
         switch (node->kind) {
-            case Ast_Kind_Macro:            overload = macro_resolve_header(context, (AstMacro *) node, param_args, NULL, 0); break;
-            case Ast_Kind_Polymorphic_Proc: overload = polymorphic_proc_build_only_header(context, (AstFunction *) node, PPLM_By_Arguments, param_args); break;
+            case Ast_Kind_Macro:            overload = macro_resolve_header(context, (AstMacro *) node, param_args, NULL, 0, NULL); break;
+            case Ast_Kind_Polymorphic_Proc:
+                if (poly_proc_needs_expected_return((AstFunction *) node)) {
+                    overload = polymorphic_proc_prepare_argument_probe(context, (AstFunction *) node, param_args);
+                } else {
+                    overload = polymorphic_proc_build_only_header(context, (AstFunction *) node, PPLM_By_Arguments, param_args);
+                }
+                break;
             case Ast_Kind_Function:
                 overload = (AstFunction *) node;
                 arguments_clear_baked_flags(&args);
@@ -637,7 +738,7 @@ AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadO
 
             // return and not continue because if the overload that didn't have a type will
             // work in the future, then it has to take precedence over the other options available.
-            bh_imap_free(&all_overloads);
+            if (local) bh_imap_free(all_overloads);
             bh_arr_free(args.values);
             return (AstTyped *) &context->node_that_signals_a_yield;
         }
@@ -657,27 +758,415 @@ AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadO
         }
 
         if (tm == TYPE_MATCH_YIELD) {
-            bh_imap_free(&all_overloads);
+            if (local) bh_imap_free(all_overloads);
             bh_arr_free(args.values);
             return (AstTyped *) &context->node_that_signals_a_yield;
         }
     }
 
-    bh_imap_free(&all_overloads);
+    if (local) bh_imap_free(all_overloads);
     bh_arr_free(args.values);
     return matched_overload;
 }
 
-AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption) overloads, Type* type) {
+typedef enum OptionMatchKind {
+    OPTION_MATCH_NONE = 0,
+    OPTION_MATCH_YIELD,
+    OPTION_MATCH_SOLVED,
+    OPTION_MATCH_NEEDS_RETURN,
+} OptionMatchKind;
+
+static b32 function_return_matches(Context *context, Type *ret, Type *expected) {
+    if (!ret || !expected) return 0;
+    if (ret == context->types.auto_return) return 0;
+    if (types_are_compatible(context, ret, expected)) return 1;
+    if (ret->kind != Type_Kind_Compound) return 0;
+
+    if (expected->kind != Type_Kind_Compound) {
+        if (ret->Compound.count == 0) return 0;
+        return types_are_compatible(context, ret->Compound.types[0], expected);
+    }
+
+    if (expected->Compound.count > ret->Compound.count) return 0;
+    fori (i, 0, expected->Compound.count) {
+        if (!types_are_compatible(context, ret->Compound.types[i], expected->Compound.types[i])) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static OptionMatchKind match_overload_option_raw(Context *context, AstTyped *node, Arguments *param_args, AstFunction **out_func) {
+    node = (AstTyped *) strip_aliases((AstNode *) node);
+    if (!node) return OPTION_MATCH_NONE;
+
+    AstFunction *overload = NULL;
+    b32 needs_return = 0;
+
+    switch (node->kind) {
+        case Ast_Kind_Macro:
+            if (macro_needs_expected_return((AstMacro *) node)) return OPTION_MATCH_NONE;
+            overload = macro_resolve_header(context, (AstMacro *) node, param_args, NULL, 0, NULL);
+            break;
+
+        case Ast_Kind_Polymorphic_Proc:
+            if (poly_proc_needs_expected_return((AstFunction *) node)) {
+                needs_return = 1;
+                overload = polymorphic_proc_prepare_argument_probe(context, (AstFunction *) node, param_args);
+            } else {
+                overload = polymorphic_proc_build_only_header(context, (AstFunction *) node, PPLM_By_Arguments, param_args);
+            }
+            break;
+
+        case Ast_Kind_Function:
+            overload = (AstFunction *) node;
+            break;
+
+        default: return OPTION_MATCH_NONE;
+    }
+
+    if (overload == NULL) return OPTION_MATCH_NONE;
+    if (overload == (AstFunction *) &context->node_that_signals_a_yield || overload->type == NULL) {
+        return OPTION_MATCH_YIELD;
+    }
+    if (overload->kind != Ast_Kind_Function) return OPTION_MATCH_NONE;
+
+    Arguments args;
+    arguments_clone(context, &args, param_args);
+
+    // Clearing baked flags mutates the call's argument nodes. Put them back
+    // so a later option, and the real resolution, still see the original call.
+    i32 baked_count = bh_arr_length(args.values);
+    b32 *saved_baked = NULL;
+    if (baked_count > 0) {
+        saved_baked = bh_alloc_array(context->gp_alloc, b32, baked_count);
+        fori (i, 0, baked_count) {
+            AstTyped *arg = args.values[i];
+            saved_baked[i] = arg && arg->kind == Ast_Kind_Argument && ((AstArgument *) arg)->is_baked;
+        }
+    }
+
+    if (node->kind == Ast_Kind_Function) arguments_clear_baked_flags(&args);
+    arguments_remove_baked(&args);
+    arguments_ensure_length(context, &args, get_argument_buffer_size(context, &overload->type->Function, &args));
+
+    OptionMatchKind matched = OPTION_MATCH_NONE;
+    if (!fill_in_arguments(context, &args, (AstNode *) overload, NULL, 0)) {
+        goto option_match_done;
+    }
+
+    VarArgKind va_kind;
+    TypeMatch tm = check_arguments_against_type(context, &args, &overload->type->Function, &va_kind, NULL, NULL, NULL);
+
+    if (tm == TYPE_MATCH_YIELD || tm == TYPE_MATCH_SPECIAL) matched = OPTION_MATCH_YIELD;
+    else if (tm == TYPE_MATCH_SUCCESS) {
+        if (out_func) *out_func = overload;
+        matched = needs_return ? OPTION_MATCH_NEEDS_RETURN : OPTION_MATCH_SOLVED;
+    }
+
+option_match_done:
+    if (saved_baked) {
+        fori (i, 0, baked_count) {
+            AstTyped *arg = param_args->values[i];
+            if (arg && arg->kind == Ast_Kind_Argument) ((AstArgument *) arg)->is_baked = saved_baked[i];
+        }
+        bh_free(context->gp_alloc, saved_baked);
+    }
+    bh_arr_free(args.values);
+    return matched;
+}
+
+// Trying an overload must not report errors. A later option's where-clause
+// can fail while an earlier option is a perfectly good match.
+static OptionMatchKind match_overload_option(Context *context, AstTyped *node, Arguments *param_args, AstFunction **out_func) {
+    i32 error_mark = bh_arr_length(context->errors.errors);
+    OptionMatchKind kind = match_overload_option_raw(context, node, param_args, out_func);
+    if (!context->cycle_detected && bh_arr_length(context->errors.errors) > error_mark) {
+        bh_arr_set_length(context->errors.errors, error_mark);
+    }
+    return kind;
+}
+
+static AstFunction *header_for_expected_return(Context *context, AstFunction *pp, Arguments *args, Type *expected) {
+    PolyArgumentLookup lookup;
+    lookup.args = args;
+    lookup.expected_return = expected;
+
+    bh_arr(AstPolySolution) slns = find_polymorphic_slns(context, pp, PPLM_By_Arguments_And_Return, &lookup, NULL, 0);
+    if (context->polymorph.flag_to_yield) {
+        context->polymorph.flag_to_yield = 0;
+        return (AstFunction *) &context->node_that_signals_a_yield;
+    }
+    if (slns == NULL) return NULL;
+
+    return polymorphic_proc_build_only_header_with_slns(context, pp, slns, 0, 0);
+}
+
+static AstTyped *first_option_matching_expected_return(Context *context, bh_arr(OverloadOption) overloads, Arguments *args, OverloadCache *cache, Type *expected) {
+    bh_imap local_overloads;
+    bh_imap *all_overloads = overload_cache_get(context, overloads, cache);
+    b32 local = 0;
+    if (!all_overloads) {
+        bh_imap_init(&local_overloads, context->gp_alloc, bh_arr_length(overloads) * 2);
+        build_all_overload_options(overloads, &local_overloads);
+        all_overloads = &local_overloads;
+        local = 1;
+    }
+
+    AstTyped *matched = NULL;
+    bh_arr_each(bh__imap_entry, entry, all_overloads->entries) {
+        AstTyped *node = (AstTyped *) strip_aliases((AstNode *) entry->key);
+        AstFunction *func = NULL;
+
+        // A macro whose return type is polymorphic is solved with the expected
+        // type, then its where clause runs. Argument-only matching cannot see $R.
+        if (node->kind == Ast_Kind_Macro && macro_needs_expected_return((AstMacro *) node)) {
+            func = macro_resolve_header(context, (AstMacro *) node, args, NULL, 0, expected);
+            if (func == (AstFunction *) &context->node_that_signals_a_yield) {
+                if (local) bh_imap_free(all_overloads);
+                return (AstTyped *) &context->node_that_signals_a_yield;
+            }
+            if (func == NULL) continue;
+            goto have_header;
+        }
+
+        OptionMatchKind kind = match_overload_option(context, node, args, &func);
+
+        if (kind == OPTION_MATCH_YIELD) {
+            if (local) bh_imap_free(all_overloads);
+            return (AstTyped *) &context->node_that_signals_a_yield;
+        }
+        if (kind == OPTION_MATCH_NONE) continue;
+
+        if (kind == OPTION_MATCH_NEEDS_RETURN) {
+            func = header_for_expected_return(context, (AstFunction *) node, args, expected);
+            if (func == (AstFunction *) &context->node_that_signals_a_yield) {
+                if (local) bh_imap_free(all_overloads);
+                return (AstTyped *) &context->node_that_signals_a_yield;
+            }
+            if (func == NULL) continue;
+        }
+
+      have_header:
+        if (!func || !func->type || !func->type->Function.return_type) {
+            if (local) bh_imap_free(all_overloads);
+            return (AstTyped *) &context->node_that_signals_a_yield;
+        }
+        if (func->type->Function.return_type == context->types.auto_return) {
+            if (local) bh_imap_free(all_overloads);
+            return (AstTyped *) &context->node_that_signals_a_yield;
+        }
+
+        if (function_return_matches(context, func->type->Function.return_type, expected)) {
+            matched = node;
+            break;
+        }
+    }
+
+    if (local) bh_imap_free(all_overloads);
+    return matched;
+}
+
+AstTyped* find_matching_overload_for_expected_return(Context *context, bh_arr(OverloadOption) overloads, Arguments* args, OverloadCache *cache, Type *expected_return) {
+    return first_option_matching_expected_return(context, overloads, args, cache, expected_return);
+}
+
+CallDeferral call_should_wait_for_expected_type(Context *context, AstTyped *callee, Arguments *args) {
+    callee = (AstTyped *) strip_aliases((AstNode *) callee);
+    if (!callee) return CALL_DEFER_READY;
+
+    if (callee->kind == Ast_Kind_Polymorphic_Proc) {
+        if (poly_proc_needs_expected_return((AstFunction *) callee)) return CALL_DEFER_WAIT;
+        return CALL_DEFER_READY;
+    }
+
+    if (callee->kind == Ast_Kind_Macro) {
+        if (macro_needs_expected_return((AstMacro *) callee)) return CALL_DEFER_WAIT;
+        return CALL_DEFER_READY;
+    }
+
+    if (callee->kind != Ast_Kind_Overloaded_Function) return CALL_DEFER_READY;
+
+    // Do not solidify a macro or a return-only procedure just to decide to wait.
+    // Where clauses run when the expected type is known and the option is chosen.
+    AstOverloadedFunction *group = (AstOverloadedFunction *) callee;
+    bh_imap local_overloads;
+    bh_imap *all_overloads = overload_cache_get(context, group->overloads, &group->all_overloads);
+    b32 local = 0;
+    if (!all_overloads) {
+        bh_imap_init(&local_overloads, context->gp_alloc, bh_arr_length(group->overloads) * 2);
+        build_all_overload_options(group->overloads, &local_overloads);
+        all_overloads = &local_overloads;
+        local = 1;
+    }
+
+    i32 matches = 0;
+    CallDeferral result = CALL_DEFER_READY;
+
+    bh_arr_each(bh__imap_entry, entry, all_overloads->entries) {
+        AstTyped *node = (AstTyped *) strip_aliases((AstNode *) entry->key);
+        if (!node) continue;
+
+        if (node->kind == Ast_Kind_Polymorphic_Proc
+            && poly_proc_needs_expected_return((AstFunction *) node)) {
+            result = CALL_DEFER_WAIT;
+            goto done;
+        }
+
+        if (node->kind == Ast_Kind_Macro && macro_needs_expected_return((AstMacro *) node)) {
+            result = CALL_DEFER_WAIT;
+            goto done;
+        }
+
+        if (node->kind != Ast_Kind_Function) continue;
+
+        OptionMatchKind kind = match_overload_option(context, node, args, NULL);
+        if (kind == OPTION_MATCH_YIELD) {
+            // A later option that is not ready must not block an earlier match.
+            result = matches == 0 ? CALL_DEFER_YIELD : CALL_DEFER_READY;
+            goto done;
+        }
+        if (kind != OPTION_MATCH_SOLVED && kind != OPTION_MATCH_NEEDS_RETURN) continue;
+
+        matches++;
+        if (matches >= 2) {
+            result = CALL_DEFER_WAIT;
+            goto done;
+        }
+    }
+
+done:
+    if (local) bh_imap_free(all_overloads);
+    return result;
+}
+
+// Options that match the arguments and do not need an expected type. A single
+// shared return type can be committed. Several return types cannot.
+b32 deferred_call_has_concrete_return(Context *context, AstCall *call) {
+    AstTyped *callee = (AstTyped *) strip_aliases((AstNode *) call->callee);
+    if (!callee || callee->kind != Ast_Kind_Overloaded_Function) return 1;
+
+    AstOverloadedFunction *group = (AstOverloadedFunction *) callee;
+    bh_imap local_overloads;
+    bh_imap *all_overloads = overload_cache_get(context, group->overloads, &group->all_overloads);
+    b32 local = 0;
+    if (!all_overloads) {
+        bh_imap_init(&local_overloads, context->gp_alloc, bh_arr_length(group->overloads) * 2);
+        build_all_overload_options(group->overloads, &local_overloads);
+        all_overloads = &local_overloads;
+        local = 1;
+    }
+
+    i32 concrete = 0;
+    b32 needs_return = 0;
+    b32 conflict = 0;
+    b32 waiting = 0;
+    Type *known = NULL;
+
+    bh_arr_each(bh__imap_entry, entry, all_overloads->entries) {
+        AstTyped *node = (AstTyped *) strip_aliases((AstNode *) entry->key);
+        if (!node) continue;
+
+        AstFunction *func = NULL;
+        OptionMatchKind kind = match_overload_option(context, node, &call->args, &func);
+        if (kind == OPTION_MATCH_YIELD) {
+            waiting = 1;
+            continue;
+        }
+        if (kind == OPTION_MATCH_NEEDS_RETURN) {
+            needs_return = 1;
+            continue;
+        }
+        if (kind != OPTION_MATCH_SOLVED || !func || !func->type) continue;
+
+        Type *ret = func->type->Function.return_type;
+        if (!ret || ret == context->types.auto_return) {
+            waiting = 1;
+            continue;
+        }
+
+        if (known && !types_are_compatible(context, known, ret)) conflict = 1;
+        else if (!known) known = ret;
+        concrete++;
+    }
+
+    if (local) bh_imap_free(all_overloads);
+
+    if (waiting && !conflict) return 0;
+
+    if (conflict) {
+        ONYX_ERROR(call->token->pos, Error_Critical,
+            "Multiple overloads match the arguments provided, but the return type is not known.");
+        return 0;
+    }
+
+    if (concrete == 0 && needs_return) {
+        ONYX_ERROR(call->token->pos, Error_Critical,
+            "Cannot solve the polymorphic return type of this call without an expected type.");
+        return 0;
+    }
+
+    return 1;
+}
+
+TypeMatch probe_call_against_expected_return(Context *context, AstTyped *callee, Arguments *args, Type *expected) {
+    callee = (AstTyped *) strip_aliases((AstNode *) callee);
+    if (!callee || !expected) return TYPE_MATCH_FAILED;
+
+    if (callee->kind == Ast_Kind_Overloaded_Function) {
+        AstOverloadedFunction *group = (AstOverloadedFunction *) callee;
+        AstTyped *found = first_option_matching_expected_return(context, group->overloads, args, &group->all_overloads, expected);
+        if (found == (AstTyped *) &context->node_that_signals_a_yield) return TYPE_MATCH_YIELD;
+        if (found == NULL) return TYPE_MATCH_FAILED;
+        return TYPE_MATCH_SUCCESS;
+    }
+
+    if (callee->kind == Ast_Kind_Macro && macro_needs_expected_return((AstMacro *) callee)) {
+        AstFunction *header = macro_resolve_header(context, (AstMacro *) callee, args, NULL, 0, expected);
+        if (header == (AstFunction *) &context->node_that_signals_a_yield) return TYPE_MATCH_YIELD;
+        if (header == NULL || !header->type || !header->type->Function.return_type) return TYPE_MATCH_FAILED;
+        if (!function_return_matches(context, header->type->Function.return_type, expected)) return TYPE_MATCH_FAILED;
+        return TYPE_MATCH_SUCCESS;
+    }
+
+    if (callee->kind == Ast_Kind_Polymorphic_Proc && poly_proc_needs_expected_return((AstFunction *) callee)) {
+        AstFunction *header = header_for_expected_return(context, (AstFunction *) callee, args, expected);
+        if (header == (AstFunction *) &context->node_that_signals_a_yield) return TYPE_MATCH_YIELD;
+        if (header == NULL) return TYPE_MATCH_FAILED;
+
+        AstFunction *checked = NULL;
+        OptionMatchKind kind = match_overload_option(context, callee, args, &checked);
+        if (kind == OPTION_MATCH_YIELD) return TYPE_MATCH_YIELD;
+        if (kind == OPTION_MATCH_NONE) return TYPE_MATCH_FAILED;
+        if (!header->type || !header->type->Function.return_type) return TYPE_MATCH_YIELD;
+        if (!function_return_matches(context, header->type->Function.return_type, expected)) return TYPE_MATCH_FAILED;
+        return TYPE_MATCH_SUCCESS;
+    }
+
+    AstFunction *func = NULL;
+    OptionMatchKind kind = match_overload_option(context, callee, args, &func);
+    if (kind == OPTION_MATCH_YIELD) return TYPE_MATCH_YIELD;
+    if (kind != OPTION_MATCH_SOLVED || !func || !func->type) return TYPE_MATCH_FAILED;
+    if (!function_return_matches(context, func->type->Function.return_type, expected)) return TYPE_MATCH_FAILED;
+    return TYPE_MATCH_SUCCESS;
+}
+
+AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption) overloads, Type* type, OverloadCache *cache) {
     if (type->kind != Type_Kind_Function) return NULL;
 
-    bh_imap all_overloads;
-    bh_imap_init(&all_overloads, context->gp_alloc, bh_arr_length(overloads) * 2);
-    build_all_overload_options(overloads, &all_overloads);
+    bh_imap local_overloads;
+    bh_imap *all_overloads = overload_cache_get(context, overloads, cache);
+    b32 local = 0;
+    if (!all_overloads) {
+        bh_imap_init(&local_overloads, context->gp_alloc, bh_arr_length(overloads) * 2);
+        build_all_overload_options(overloads, &local_overloads);
+        all_overloads = &local_overloads;
+        local = 1;
+    }
 
     AstTyped *matched_overload = NULL;
 
-    bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
+    bh_arr_each(bh__imap_entry, entry, all_overloads->entries) {
         AstTyped* node = (AstTyped *) entry->key;
         if (node->kind == Ast_Kind_Overloaded_Function) continue;
 
@@ -688,15 +1177,16 @@ AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption
         }
 
         if (tm == TYPE_MATCH_YIELD) {
+            if (local) bh_imap_free(all_overloads);
             return (AstTyped *) &context->node_that_signals_a_yield;
         }
     }
-    
-    bh_imap_free(&all_overloads);
+
+    if (local) bh_imap_free(all_overloads);
     return matched_overload;
 }
 
-void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(OverloadOption) overloads) {
+void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(OverloadOption) overloads, Type *expected_return) {
     char* arg_str = bh_alloc(context->scratch_alloc, 1024);
     arg_str[0] = '\0';
 
@@ -725,7 +1215,13 @@ void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(Ove
         }
     }
 
-    ONYX_ERROR(call->token->pos, Error_Critical, "Unable to match overloaded function with provided argument types: (%s)", arg_str);
+    if (expected_return) {
+        ONYX_ERROR(call->token->pos, Error_Critical,
+            "Unable to match overloaded function with provided argument types: (%s), expected return type '%s'.",
+            arg_str, type_get_name(context, expected_return));
+    } else {
+        ONYX_ERROR(call->token->pos, Error_Critical, "Unable to match overloaded function with provided argument types: (%s)", arg_str);
+    }
 
     bh_free(context->scratch_alloc, arg_str);
 
@@ -830,6 +1326,44 @@ void ensure_overload_returns_correct_type(Context *context, AstTyped *overload, 
 //
 //
 // TODO: Write this documentation
+
+static AstTyped *macro_wrap_value_as_any(Context *context, AstTyped *value, AstBlock *expansion, OnyxToken *token) {
+    resolve_expression_type(context, value);
+
+    static BH_THREAD_LOCAL i32 tmp_id = 0;
+    OnyxToken *tmp_token = bh_alloc_item(context->ast_alloc, OnyxToken);
+    tmp_token->type = Token_Type_Symbol;
+    tmp_token->text = bh_aprintf(context->ast_alloc, "__macro_any_%d", tmp_id++);
+    tmp_token->length = strlen(tmp_token->text);
+    tmp_token->pos = token ? token->pos : (OnyxFilePos) { 0 };
+
+    AstLocal *tmp = make_local_with_type(context, tmp_token, value->type);
+    tmp->token = tmp_token;
+
+    AstBinaryOp *assign = make_binary_op(context, Binary_Op_Assign, (AstTyped *) tmp, value);
+    assign->token = token;
+
+    tmp->next = (AstNode *) assign;
+    assign->next = expansion->body;
+    expansion->body = (AstNode *) tmp;
+
+    AstAddressOf *addr = make_address_of(context, (AstTyped *) tmp);
+    addr->token = token;
+
+    AstTypeOf *tof = onyx_ast_node_new(context->ast_alloc, sizeof(AstTypeOf), Ast_Kind_Typeof);
+    tof->token = token;
+    tof->expr = (AstTyped *) tmp;
+
+    AstStructLiteral *sl = onyx_ast_node_new(context->ast_alloc, sizeof(AstStructLiteral), Ast_Kind_Struct_Literal);
+    sl->token = token;
+    sl->stnode = (AstTyped *) context->builtins.any_type;
+    arguments_initialize(context, &sl->args);
+    bh_arr_push(sl->args.values, (AstTyped *) addr);
+    bh_arr_push(sl->args.values, (AstTyped *) tof);
+
+    return (AstTyped *) sl;
+}
+
 void expand_macro(Context *context, AstCall** pcall, AstFunction* template) {
     AstCall* call = *pcall;
     AstMacro* macro = (AstMacro *) call->callee;
@@ -876,7 +1410,7 @@ void expand_macro(Context *context, AstCall** pcall, AstFunction* template) {
         subst = (AstNode *) doblock;
     }
 
-    Scope* argument_scope = scope_create(context, NULL, call->token->pos);
+    Scope* argument_scope = scope_create(context, context->checker.current_scope, call->token->pos);
     if (expansion->binding_scope != NULL)
         scope_include(context, argument_scope, expansion->binding_scope, call->token->pos);
     expansion->binding_scope = argument_scope;
@@ -884,17 +1418,67 @@ void expand_macro(Context *context, AstCall** pcall, AstFunction* template) {
     // HACK HACK HACK This is probably very wrong. I don't know what guarentees that
     // the paramters and arguments are going to be in the same order exactly.
     Type *any_type = type_build_from_ast(context, context->builtins.any_type);
-    fori (i, 0, bh_arr_length(call->args.values)) {
-        AstNode *value = (AstNode *) ((AstArgument *) call->args.values[i])->value;
+    i32 arg_i = 0;
+    i32 arg_count = bh_arr_length(call->args.values);
+    fori (i, 0, bh_arr_length(template->params)) {
         assert(template->params[i].local->type);
 
         Type *param_type = template->params[i].local->type;
-        if (param_type == any_type
-            || (param_type->kind == Type_Kind_VarArgs && param_type->VarArgs.elem == any_type)) {
-            ONYX_ERROR(macro->token->pos, Error_Critical, "Currently, macros do not support arguments of type 'any' or '..any'.");
+        AstTyped *value = NULL;
+
+        if (param_type == any_type) {
+            assert(arg_i < arg_count);
+            AstTyped *raw = ((AstArgument *) call->args.values[arg_i++])->value;
+            if (raw->type == any_type) {
+                value = raw;
+            } else {
+                value = macro_wrap_value_as_any(context, raw, expansion, call->token);
+            }
+
+        } else if (param_type->kind == Type_Kind_VarArgs && param_type->VarArgs.elem == any_type) {
+            AstArrayLiteral *al = onyx_ast_node_new(context->ast_alloc, sizeof(AstArrayLiteral), Ast_Kind_Array_Literal);
+            al->token = call->token;
+            al->atnode = (AstTyped *) context->builtins.any_type;
+            bh_arr_new(context->ast_alloc, al->values, bh_max(arg_count - arg_i, 0));
+
+            while (arg_i < arg_count) {
+                AstTyped *raw = ((AstArgument *) call->args.values[arg_i++])->value;
+                if (raw->type != any_type) {
+                    raw = macro_wrap_value_as_any(context, raw, expansion, call->token);
+                }
+                bh_arr_push(al->values, raw);
+            }
+
+            value = (AstTyped *) al;
+
+        } else {
+            assert(arg_i < arg_count);
+            value = ((AstArgument *) call->args.values[arg_i++])->value;
         }
 
-        symbol_introduce(context, argument_scope, template->params[i].local->token, value);
+        symbol_introduce(context, argument_scope, template->params[i].local->token, (AstNode *) value);
+
+        if (template->params[i].is_used) {
+            if (type_is_struct(param_type)) {
+                Type *st;
+                if (param_type->kind == Type_Kind_Struct) {
+                    st = param_type;
+                } else {
+                    st = param_type->Pointer.elem;
+                }
+
+                if (st->Struct.status == SPS_Uses_Done) {
+                    fori (j, 0, shlen(st->Struct.members)) {
+                        StructMember* member = st->Struct.members[j].value;
+                        AstFieldAccess* fa = make_field_access(context, value, member->name);
+                        symbol_raw_introduce(context, argument_scope, member->name, template->params[i].local->token->pos, (AstNode *) fa);
+                    }
+                }
+
+            } else if (param_type != NULL) {
+                ONYX_ERROR(template->params[i].local->token->pos, Error_Critical, "Can only 'use' structures or pointers to structures.");
+            }
+        }
     }
 
     if (template->poly_scope != NULL)
@@ -933,7 +1517,7 @@ void expand_macro(Context *context, AstCall** pcall, AstFunction* template) {
     return;
 }
 
-AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed) {
+AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed, Type *expected_return) {
     switch (macro->body->kind) {
         case Ast_Kind_Function: return (AstFunction *) macro->body;
 
@@ -941,7 +1525,17 @@ AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* 
             AstFunction* pp = (AstFunction *) macro->body;
             ensure_polyproc_cache_is_created(context, pp);
 
-            bh_arr(AstPolySolution) slns = find_polymorphic_slns(context, pp, PPLM_By_Arguments, args, callsite, error_if_failed);
+            bh_arr(AstPolySolution) slns;
+            if (poly_proc_needs_expected_return(pp)) {
+                if (!expected_return) return NULL;
+
+                PolyArgumentLookup lookup;
+                lookup.args = args;
+                lookup.expected_return = expected_return;
+                slns = find_polymorphic_slns(context, pp, PPLM_By_Arguments_And_Return, &lookup, callsite, error_if_failed);
+            } else {
+                slns = find_polymorphic_slns(context, pp, PPLM_By_Arguments, args, callsite, error_if_failed);
+            }
 
             if (slns == NULL) {
                 if (context->polymorph.flag_to_yield) {
@@ -952,7 +1546,7 @@ AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* 
                 return NULL;
             }
 
-            return polymorphic_proc_build_only_header_with_slns(context, pp, slns, error_if_failed);
+            return polymorphic_proc_build_only_header_with_slns(context, pp, slns, error_if_failed, 0);
         }
 
         default: assert("Bad macro body type." && 0);
@@ -1168,6 +1762,8 @@ b32 fill_in_arguments(Context *context, Arguments* args, AstNode* provider, char
 // Argument checking
 //
 
+
+
 typedef enum ArgState {
     AS_Expecting_Exact,
     AS_Expecting_Typed_VA,
@@ -1267,9 +1863,10 @@ TypeMatch check_arguments_against_type(Context *context, Arguments* args, TypeFu
                 if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
 
                 if (variadic_type->id == any_type_id) {
+                    i32 error_mark = bh_arr_length(context->errors.errors);
                     resolve_expression_type(context, arg_arr[arg_pos]->value);
                     if (arg_arr[arg_pos]->value->type == NULL) {
-                        if (error != NULL) {
+                        if (error != NULL && bh_arr_length(context->errors.errors) == error_mark) {
                             error->pos = arg_arr[arg_pos]->token->pos;
                             error->text = "Unable to resolve type of argument.";
                         }
@@ -1307,9 +1904,10 @@ TypeMatch check_arguments_against_type(Context *context, Arguments* args, TypeFu
                 if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
 
                 assert(arg_arr[arg_pos]->kind == Ast_Kind_Argument);
+                i32 error_mark = bh_arr_length(context->errors.errors);
                 resolve_expression_type(context, arg_arr[arg_pos]->value);
                 if (arg_arr[arg_pos]->value->type == NULL) {
-                    if (error != NULL) {
+                    if (error != NULL && bh_arr_length(context->errors.errors) == error_mark) {
                         error->pos = arg_arr[arg_pos]->token->pos;
                         error->text = "Unable to resolve type for argument.";
                     }
@@ -1403,6 +2001,11 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
     i32 total_len = 0;
     for (i32 i = 0; i < len; i++) {
         if (src[i] == '\\') {
+            if (i + 1 >= len) {
+                *dest++ = '\\';
+                total_len++;
+                break;
+            }
             i++;
             switch (src[i]) {
             case '0':  *dest++ = '\0'; total_len++; break;
@@ -1418,6 +2021,7 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
             case '\'': *dest++ = '\''; total_len++; break;
             case '\\': *dest++ = '\\'; total_len++; break;
             case 'x': {
+                if (i + 2 >= len) break;
                 u8 ch1 = src[i + 1];
                 u8 ch2 = src[i + 2];
                 *dest++ = (i8) (char_to_base16_value(ch1) << 4 | char_to_base16_value(ch2));
@@ -1468,9 +2072,11 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
 
 static Scope **get_scope_from_node_helper(Context *context, AstNode *node) {
     b32 used_pointer = 0;
+    i32 peel_depth = 0;
 
     while (1) {
         if (!node) return NULL;
+        if (++peel_depth > 64) return NULL;
 
         switch (node->kind) {
             case Ast_Kind_Type_Raw_Alias: node = (AstNode *) ((AstTypeRawAlias *) node)->to->ast_type; break;
@@ -1502,6 +2108,11 @@ all_types_peeled_off:
         case Ast_Kind_Foreign_Block: {
             AstForeignBlock* fb = (AstForeignBlock *) node;
             return &fb->scope;
+        }
+
+        case Ast_Kind_Object_Block: {
+            AstObjectBlock* ob = (AstObjectBlock *) node;
+            return &ob->scope;
         }
 
         case Ast_Kind_Basic_Type: {
@@ -1593,6 +2204,11 @@ Scope *get_scope_from_node_or_create(Context *context, AstNode *node) {
         if (node->token) pos = node->token->pos;
 
         *pscope = scope_create(context, NULL, pos);
+
+        if (node_is_type(node)) {
+            Type *t = type_build_from_ast(context, (AstType *) node);
+            if (t) compilation_log_emit_type_body(context, t);
+        }
     }
 
     return *pscope;
@@ -1629,10 +2245,12 @@ char *find_closest_symbol_in_scope(Context *context, Scope *scope, char *sym, u3
     if (scope == NULL) return NULL;
 
     char* closest = NULL;
-    fori (i, 0, shlen(scope->symbols)) {
-        if (scope->symbols[i].value && scope->symbols[i].value->flags & Ast_Flag_Symbol_Invisible) continue;
+    i32 n = scope_symbol_count(scope);
+    fori (i, 0, n) {
+        AstNode *node = scope_symbol_at(scope, i);
+        if (node && node->flags & Ast_Flag_Symbol_Invisible) continue;
 
-        char *key = scope->symbols[i].key;
+        char *key = (char *) atom_name(context, scope_symbol_atom_at(scope, i));
         u32 d = levenshtein_distance(context, key, sym); 
         if (d < *out_distance) {
             *out_distance = d;
@@ -1678,86 +2296,12 @@ char *find_closest_symbol_in_node(Context *context, AstNode* node, char *sym) {
 
 
 
-static u32 symbol_info_get_file_id(SymbolInfoTable *syminfo, const char *filename) {
-    u32 file_id;
-    if (shgeti(syminfo->files, filename) == -1) {
-        file_id = syminfo->next_file_id++;
-        shput(syminfo->files, filename, file_id);
-
-    } else {
-        file_id = shget(syminfo->files, filename);
-    }
-
-    return file_id;
-}
-
-void track_declaration_for_symbol_info(Context *context, OnyxFilePos pos, AstNode *node) {
-    if (!context->options.generate_symbol_info_file) return;
-    if (pos.filename == NULL) return;
-
-    SymbolInfoTable *syminfo = context->symbol_info;
-    assert(syminfo);
-
-    if (bh_imap_has(&syminfo->node_to_id, (u64) node)) return;
-
-    u32 symbol_id = syminfo->next_symbol_id++;
-    u32 file_id = symbol_info_get_file_id(syminfo, pos.filename);
-
-    SymbolInfo symbol;
-    symbol.id = symbol_id;
-    symbol.file_id = file_id;
-    symbol.line = pos.line;
-    symbol.column = pos.column;
-    symbol.documentation = NULL;
-    symbol.documentation_length = 0;
-    bh_arr_push(syminfo->symbols, symbol);
-
-    bh_imap_put(&syminfo->node_to_id, (u64) node, (u64) symbol_id);
-}
-
 void track_documentation_for_symbol_info(Context *context, AstNode *node, AstBinding *binding) {
-    if (!context->options.generate_lsp_info_file) return;
-    if (!context->options.generate_symbol_info_file) return;
-
-    SymbolInfoTable *syminfo = context->symbol_info;
-    assert(syminfo);
-
-    if (!bh_imap_has(&syminfo->node_to_id, (u64) node)) return;
-
-    u64 symbol_id = bh_imap_get(&syminfo->node_to_id, (u64) node);
-    if (binding->documentation_token_old) {
-        syminfo->symbols[symbol_id].documentation        = binding->documentation_token_old->text;
-        syminfo->symbols[symbol_id].documentation_length = binding->documentation_token_old->length;
-    } else if (binding->documentation_string) {
-        syminfo->symbols[symbol_id].documentation = binding->documentation_string;
-        syminfo->symbols[symbol_id].documentation_length = strlen(binding->documentation_string);
-    } else {
-        syminfo->symbols[symbol_id].documentation = "";
-        syminfo->symbols[symbol_id].documentation_length = 0;
-    }
+    compilation_log_emit_binding(context, node, binding);
 }
 
 void track_resolution_for_symbol_info(Context *context, AstNode *original, AstNode *resolved) {
-    if (!context->options.generate_symbol_info_file) return;
-    if (!resolved) return;
-
-    SymbolInfoTable *syminfo = context->symbol_info;
-    assert(syminfo);
-
-    if (!bh_imap_has(&syminfo->node_to_id, (u64) resolved)) return;
-
-    u32 symbol_id = (u32) bh_imap_get(&syminfo->node_to_id, (u64) resolved);
-
-    u32 file_id = symbol_info_get_file_id(syminfo, original->token->pos.filename);
-
-    SymbolResolution res;
-    res.symbol_id = symbol_id;
-    res.file_id = file_id;
-    res.line = original->token->pos.line;
-    res.column = original->token->pos.column;
-    res.length = original->token->length;
-
-    bh_arr_push(syminfo->symbols_resolutions, res);
+    compilation_log_emit_symbol_resolved(context, original, resolved);
 }
 
 

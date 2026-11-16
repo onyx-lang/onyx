@@ -1,7 +1,10 @@
 package main
 
+use core {*}
 use core.encoding.xml
-use core {printf}
+use core.encoding.utf8
+
+// @leak-check
 
 test_doc :: """
 <?xml version="1.0" encoding="utf-8"?>
@@ -33,14 +36,142 @@ test_doc :: """
 </ListOfData>
 """
 
+@xml.Name.{name="person"}
+Person :: struct {
+    @xml.Attr.{name="id"}
+    id: i32
+    @xml.Name.{name="full-name"}
+    name: str
+    @xml.Ignore
+    scratch: i32
+    aliases: [..] str
+    age: ? i32
+}
+
+@xml.Name.{name="item", space="http://example.com"}
+Item :: struct {
+    n: str
+}
+
 main :: () {
     use doc := xml.parse(test_doc)!
 
     for ch in doc->children(0) {
-        printf("Child: {*p}\n", &doc.elements[ch])
+        printf("Child: {}\n", doc.elements[ch].name)
 
         name  := doc.elements[doc->child_with_name(ch, "Name")!].children[0].Text!
         value := doc.elements[doc->child_with_name(ch, "Value")!].children[0].Text!
         printf("Name (value): {'} ({})\n", name, value)
     }
+
+    println(doc->attr(0, "Source") ?? "")
+    println(doc->attr(0, "missing") == .None)
+
+    n := 0
+    for doc->children_with_name(0, "Datapoint") {
+        n += 1
+    }
+    println(n)
+
+    first := doc->children(0)->next_opt()!
+    println(doc->text(doc->child_with_name(first, "Name")!))
+
+    small := xml.parse("<root a=\"1\"><x>hi &amp; bye</x><empty/></root>")!
+    defer delete(&small)
+    println(small->attr(0, "a") ?? "")
+    println(small->text(small->child_with_name(0, "x")!))
+    println(small->text(small->child_with_name(0, "empty")!))
+
+    s := small->write_string()
+    defer str.free(s)
+    println(s)
+
+    pretty := small->write_string(indent=2)
+    defer str.free(pretty)
+    println(pretty)
+
+    quoted := xml.parse("<e k=\"&quot;q&quot;\">a&lt;b&#x20;c</e>")!
+    defer delete(&quoted)
+    println(quoted->attr(0, "k") ?? "")
+    println(quoted->text(0))
+    qs := quoted->write_string()
+    defer str.free(qs)
+    println(qs)
+
+    bad := make(dyn_str);
+    defer delete(&bad);
+    dyn_str.append(&bad, "<z>");
+    dyn_str.append(&bad, u8.[0x80]);
+    dyn_str.append(&bad, "</z>");
+    use zd := xml.parse(bad)!
+    tr, tn := utf8.decode_rune(zd->text(0))
+    printf("{} {}\n", tr, tn)
+
+    nq := 0
+    for doc->query_all("/ListOfData/Datapoint") {
+        nq += 1
+    }
+    println(nq)
+    println(doc->query_text("/ListOfData/Datapoint[2]/Name") ?? "")
+    println(doc->query_attr("/ListOfData/@Source") ?? "")
+    println(doc->query("/ListOfData/Datapoint[9]") == .None)
+
+    use qdoc := xml.parse("<r><e id=\"a\">1</e><e id=\"b\">2</e><e id=\"c\">3</e></r>")!
+    println(qdoc->query_text("/r/e[@id='b']") ?? "")
+    println(qdoc->query_text("/r/e[3]") ?? "")
+    nstar := 0
+    for qdoc->query_all("/r/*") {
+        nstar += 1
+    }
+    println(nstar)
+    println(qdoc->query_text("//e[@id='c']") ?? "")
+
+    use nsdoc := xml.parse("<a xmlns:h=\"http://www.w3.org/TR/html4/\" xmlns=\"http://example.com\"><h:td id=\"x\">Hello</h:td><item/></a>")!
+    println(nsdoc.elements[0].local)
+    println(nsdoc.elements[0].space)
+    td := nsdoc->child_with_name(0, "td")!
+    println(nsdoc.elements[td].prefix)
+    println(nsdoc.elements[td].local)
+    println(nsdoc.elements[td].space)
+    item := nsdoc->child_with_name(0, "item")!
+    println(nsdoc.elements[item].space)
+    println(nsdoc->attr(td, "id") ?? "")
+
+    use dtd := xml.parse("<!DOCTYPE note SYSTEM \"note.dtd\" [<!ELEMENT note (#PCDATA)>]><note>hi</note>")!
+    println(dtd.doctype.name)
+    println(dtd.doctype.system_id)
+    println(dtd.doctype.internal_subset)
+    ds := dtd->write_string()
+    defer str.free(ds)
+    println(ds)
+
+    use cafe := xml.parse("<café>oui</café>")!
+    println(cafe.elements[0].name)
+    println(cafe->text(0))
+
+    p := xml.decode_as("""
+        <person id="7">
+            <full-name>Ada</full-name>
+            <aliases>A</aliases>
+            <aliases>B</aliases>
+            <age>36</age>
+        </person>
+    """, Person)!
+    defer {
+        str.free(p.name)
+        for a in p.aliases do str.free(a)
+        delete(&p.aliases)
+    }
+    printf("{} {} {} {}\n", p.id, p.name, p.aliases.count, p.age ?? -1)
+    println(p.scratch)
+    enc := xml.encode_string(p)!
+    defer str.free(enc)
+    println(enc)
+
+    it := xml.decode_as("<item xmlns=\"http://example.com\"><n>x</n></item>", Item)!
+    defer str.free(it.n)
+    println(it.n)
+    items := xml.encode_string(it)!
+    defer str.free(items)
+    println(items)
 }

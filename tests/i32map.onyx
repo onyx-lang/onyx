@@ -6,24 +6,24 @@ use core {*}
 
 main :: (args: [] cstr) {
     imap : Map(i32, str);
-    map.init(&imap);
+    map.Map.init(&imap);
     defer {
         print("Freeing map\n");
-        map.free(&imap);
+        map.Map.free(&imap);
     }
-    map.put(&imap, 50, "Hello ");
+    map.Map.put(&imap, 50, "Hello ");
     imap->put(1234, "World!");
 
-    println(map.has(&imap, 50));
-    println(map.has(&imap, 51));
+    println(map.Map.has(&imap, 50));
+    println(map.Map.has(&imap, 51));
 
-    printf("{}{}\n", map.get(&imap, 50)->unwrap(), map.get(&imap, 1234)->unwrap());
+    printf("{}{}\n", map.Map.get(&imap, 50)->unwrap(), map.Map.get(&imap, 1234)->unwrap());
 
     printf("{*p}\n", &imap);
 
-    map.delete(&imap, 50);
-    println(map.has(&imap, 50));
+    map.Map.remove(&imap, 50);
+    println(map.Map.has(&imap, 50));
 
-    map.clear(&imap);
-    println(map.has(&imap, 1234));
+    map.Map.clear(&imap);
+    println(map.Map.has(&imap, 1234));
 }

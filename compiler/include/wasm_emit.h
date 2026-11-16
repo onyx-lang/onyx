@@ -537,6 +537,11 @@ typedef struct LocalAllocator {
 
     i32 max_stack;
     i32 curr_stack;
+
+    // Compound literals inside an expression macro pin this so a later rewind
+    // cannot reuse their slots. The macro frees those slots when it returns,
+    // which is too early when the returned value still points at them.
+    i32 stack_floor;
 } LocalAllocator;
 
 typedef struct WasmFunc {
@@ -545,6 +550,11 @@ typedef struct WasmFunc {
     bh_arr(WasmInstruction) code;
     OnyxToken *location;
     char *name;
+
+    // Linked from a WASM object file. The bytes are the function body
+    // (locals and expression) with relocations already patched in place.
+    u8 *raw_body;
+    u32 raw_body_len;
 } WasmFunc;
 
 typedef struct WasmGlobal {
@@ -594,6 +604,7 @@ typedef enum DatumPatchInfoKind {
     Datum_Patch_Instruction,
     Datum_Patch_Data,
     Datum_Patch_Relative,
+    Datum_Patch_Table_Index,
 } DatumPatchInfoKind;
 
 typedef enum CodePatchInfoKind {
@@ -603,6 +614,7 @@ typedef enum CodePatchInfoKind {
     Code_Patch_Tls_Offset,
     Code_Patch_String_Length,
     Code_Patch_String_Length_In_Data,
+    Code_Patch_Table_Index,
 } CodePatchInfoKind;
 
 //
@@ -705,18 +717,27 @@ typedef struct PatchInfo {
     u32 instruction_index;
 } PatchInfo;
 
-typedef struct ForRemoveInfo {
-    // These are WASM locals
-    u64 iterator_remove_func;
-    u64 iterator_data_ptr;
-
-    i32 remove_func_type_idx;
-} ForRemoveInfo;
-
 typedef struct JsPartial {
     u32 order;
     char *code;
 } JsPartial;
+
+// A memory-address relocation in a linked object function or data segment.
+// Applied after datum offsets are assigned. data_id 0 means `extra` is the
+// value to write (an absolute address, or an offset from __tls_base).
+// Otherwise the value is datum.offset_ + extra.
+typedef struct OnyxObjectMemPatch {
+    u8 *bytes;
+    u32 at;
+    u8 kind;
+    i32 addend;
+    u32 data_id;
+    u32 extra;
+} OnyxObjectMemPatch;
+
+#define ONYX_OBJ_PATCH_ULEB5 1
+#define ONYX_OBJ_PATCH_SLEB5 2
+#define ONYX_OBJ_PATCH_I32   3
 
 typedef struct OnyxWasmModule {
     Context *context;
@@ -743,10 +764,14 @@ typedef struct OnyxWasmModule {
     bh_arr(PatchInfo) stack_leave_patches;
     bh_arr(DatumPatchInfo) data_patches;
     bh_arr(CodePatchInfo)  code_patches;
-
-    bh_arr(ForRemoveInfo) for_remove_info;
+    // Nodes discovered while linking. Drained immediately so their callees
+    // are emitted before code patches run. The entity heap is already empty.
+    bh_arr(AstNode *) link_emit_queue;
 
     bh_arr(AstForeignBlock *) foreign_blocks;
+    bh_arr(AstObjectBlock *) object_blocks;
+    bh_arr(AstFunction *) object_functions;
+    bh_arr(OnyxObjectMemPatch) object_mem_patches;
     u32 next_foreign_block_idx;
 
     bh_arr(AstFunction *) procedures_with_tags;
@@ -788,9 +813,17 @@ typedef struct OnyxWasmModule {
     u32 next_foreign_func_idx;
     u32 next_global_idx;
     u32 next_tls_offset;
+    // C TLS from linked objects is appended after Onyx's own thread-locals.
+    // tls_image is a static blob: u32 offset, u32 size, then the initial bytes.
+    u32 tls_align;
+    u32 tls_image_data_id;
+    u32 tls_image_begin;
+    b32 tls_span;
 
     i32 *stack_top_ptr;
     i32 *tls_size_ptr;
+    i32 *tls_align_ptr;
+    i32 *tls_image_ptr;
     i32 *heap_start_ptr;
     u64 stack_base_idx;
     u64 stack_restore_idx;
@@ -807,6 +840,7 @@ typedef struct OnyxWasmModule {
 
     b32 has_stack_locals : 1;
     b32 doing_linking : 1;
+    b32 link_emit_draining : 1;
 
 #ifdef ENABLE_DEBUG_INFO
     struct DebugContext *debug_context;
@@ -839,6 +873,12 @@ b32 onyx_wasm_build_link_options_from_node(Context *context, OnyxWasmLinkOptions
 
 void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module);
 void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLinkOptions *options);
+b32 onyx_wasm_prepare_object(OnyxWasmModule *module);
+void onyx_wasm_module_write_object(OnyxWasmModule *module, bh_buffer *buffer);
+void onyx_wasm_link_object_files(OnyxWasmModule *module);
+// Emit a procedure or global reached while linking, including anything it uses.
+void onyx_wasm_ensure_emitted(OnyxWasmModule *module, AstNode *node);
+void onyx_wasm_apply_object_memory_patches(OnyxWasmModule *module);
 void onyx_wasm_module_free(OnyxWasmModule* module);
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer);
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);
@@ -846,7 +886,7 @@ void onyx_wasm_module_write_js_partials_to_buffer(OnyxWasmModule* module, bh_buf
 void onyx_wasm_module_write_js_partials_to_file(OnyxWasmModule* module, bh_file file);
 
 #ifdef ONYX_RUNTIME_LIBRARY
-void onyx_run_initialize(b32 debug_enabled, const char *debug_socket);
+void onyx_run_initialize(b32 debug_enabled, const char *debug_socket, b32 jit_enabled);
 b32 onyx_run_wasm_code(bh_buffer code_buffer, int argc, char *argv[]);
 #endif
 

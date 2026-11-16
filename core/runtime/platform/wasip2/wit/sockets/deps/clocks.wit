@@ -1,0 +1,18 @@
+package wasi:clocks@0.2.12;
+
+interface monotonic-clock {
+  use wasi:io/poll@0.2.12.{pollable};
+
+  type instant = u64;
+
+  type duration = u64;
+
+  now: func() -> instant;
+
+  resolution: func() -> duration;
+
+  subscribe-instant: func(when: instant) -> pollable;
+
+  subscribe-duration: func(when: duration) -> pollable;
+}
+

@@ -39,6 +39,17 @@ tty_set :: (state: &TTY_State) -> bool {
     return runtime.platform.__tty_set(state);
 }
 
+/// Saves the terminal mode and switches stdin to raw mode.
+/// The host restores the saved mode on `tty_leave_raw` and on process exit.
+tty_enter_raw :: () -> bool {
+    return runtime.platform.__tty_enter_raw();
+}
+
+/// Restores the terminal mode saved by `tty_enter_raw`.
+tty_leave_raw :: () -> bool {
+    return runtime.platform.__tty_leave_raw();
+}
+
 } else {
 
 tty_get :: () -> TTY_State {
@@ -47,6 +58,14 @@ tty_get :: () -> TTY_State {
 
 tty_set :: (state: &TTY_State) -> bool {
     panic("core.os.tty_get not supported on this platform.");
+    return false;
+}
+
+tty_enter_raw :: () -> bool {
+    return false;
+}
+
+tty_leave_raw :: () -> bool {
     return false;
 }
 

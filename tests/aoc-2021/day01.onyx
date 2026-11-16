@@ -16,14 +16,14 @@ count_increasing :: (arr: [] $T) -> u32 {
 }
 
 main :: (args) => {
-    file := os.open("./tests/aoc-2021/input/day01.txt")->expect("Error opening file");
-    reader := io.reader_make(&file);
-    defer os.close(&file);
+    file := os.File.open("./tests/aoc-2021/input/day01.txt")->expect("Error opening file");
+    reader := io.Reader.make(&file);
+    defer os.File.close(&file);
 
     nums: [..] i32;
-    while !io.reader_empty(&reader) {
-        nums << io.read_u32(&reader);
-        io.skip_whitespace(&reader);
+    while !io.Reader.empty(&reader) {
+        nums << io.Reader.read_u32(&reader);
+        io.Reader.skip_whitespace(&reader);
     }
 
     { // Part 1

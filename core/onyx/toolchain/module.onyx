@@ -3,6 +3,7 @@ package onyx.toolchain
 
 #load "./proto.onyx"
 #load "./toolchain_native.onyx"
+#load "./compilation_info.onyx"
 #load "./toolchain.onyx"
 
 

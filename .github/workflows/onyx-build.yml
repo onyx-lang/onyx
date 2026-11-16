@@ -101,11 +101,20 @@ jobs:
         run: |
           chmod +x build.sh
 
+      # Pin v4.2.6. Current Wasmer (v7) needs glibc 2.39, so it will not run on
+      # ubuntu-22.04, and the installer reports darwin-amd64 as unsupported.
+      # v4.2.6 still publishes libwasmer.a for both AMD64 targets.
       - name: Install Wasmer building dependencies (AMD64)
         if: (matrix.runtime_library == 'wasmer') && (matrix.build != 'darwin-arm64' && matrix.build != 'linux-aarch64')
         run: |
-          curl https://get.wasmer.io -sSfL | sh
-          echo "$HOME/.wasmer/bin" >> $GITHUB_PATH
+          case "${{ matrix.build }}" in
+            linux-amd64) asset=wasmer-linux-amd64.tar.gz ;;
+            darwin-amd64) asset=wasmer-darwin-amd64.tar.gz ;;
+            *) echo "unsupported wasmer target ${{ matrix.build }}"; exit 1 ;;
+          esac
+          curl -fL -o wasmer.tar.gz "https://github.com/wasmerio/wasmer/releases/download/v4.2.6/${asset}"
+          mkdir wasmer
+          tar -C wasmer -zxvf wasmer.tar.gz
 
       # Have to do MacOS ARM64 special, since I don't want to pay for the M1 GitHub runners
       # to build this natively. Instead, we directly download the ARM version of WASMER
@@ -140,6 +149,7 @@ jobs:
           ONYX_ARCH: linux_x86_64
           ONYX_RUNTIME_LIBRARY: ${{ matrix.runtime_library }} 
           ONYX_USE_DYNCALL: '1'
+          WASMER_LIB_PATH: ../wasmer/lib
           
       - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'linux-amd64') && (matrix.runtime_library == 'none')
@@ -152,7 +162,7 @@ jobs:
       - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'linux-aarch64') && (matrix.runtime_library != 'none')
         run: |
-          sudo apt update && sudo apt install --yes gcc-aarch64-linux-gnu
+          sudo apt update && sudo apt install --yes gcc-aarch64-linux-gnu qemu-user-static
           ./build.sh compile compress
         env:
           ONYX_CC: aarch64-linux-gnu-gcc
@@ -164,7 +174,7 @@ jobs:
       - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'linux-aarch64') && (matrix.runtime_library == 'none')
         run: |
-          sudo apt update && sudo apt install --yes gcc-aarch64-linux-gnu
+          sudo apt update && sudo apt install --yes gcc-aarch64-linux-gnu qemu-user-static
           ./build.sh compile compress
         env:
           ONYX_CC: aarch64-linux-gnu-gcc
@@ -178,6 +188,7 @@ jobs:
           ONYX_CC: gcc
           ONYX_ARCH: darwin_amd64
           ONYX_RUNTIME_LIBRARY: ${{ matrix.runtime_library }}
+          WASMER_LIB_PATH: ../wasmer/lib
 
       - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'darwin-amd64') && (matrix.runtime_library == 'none')

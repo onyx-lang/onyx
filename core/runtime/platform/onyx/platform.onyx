@@ -33,24 +33,22 @@ Supports_TTY :: true
 
 #library "onyx_runtime"
 
-#local {
-    __stdout: os.File;
-    __stderr: os.File;
-    __stdin:  os.File;
-}
+__stdout: os.File;
+__stderr: os.File;
+__stdin:  os.File;
 
 __output_string :: (s: str) -> u32 {
-    wrote := io.stream_write(&__stdout, s).Ok ?? 0;
+    wrote := io.Stream.write(&__stdout, s).Ok ?? 0;
     return wrote;
 }
 
 __output_error :: (s: str) -> u32 {
-    wrote := io.stream_write(&__stderr, s).Ok ?? 0;
+    wrote := io.Stream.write(&__stderr, s).Ok ?? 0;
     return wrote;
 }
 
 __read_from_input :: (buffer: [] u8) -> i32 {
-    switch io.stream_read(&__stdin, buffer) {
+    switch io.Stream.read(&__stdin, buffer) {
         case .Err as err {
             if err == .ReadPending do return 0;
             return -1;
@@ -63,7 +61,7 @@ __read_from_input :: (buffer: [] u8) -> i32 {
 }
 
 __wait_for_input :: (timeout: i32) -> bool {
-    switch io.stream_poll(&__stdin, .Read, timeout) {
+    switch io.Stream.poll(&__stdin, .Read, timeout) {
         case .Err as err {
             return false;
         }
@@ -90,16 +88,20 @@ ProcessData :: #distinct u64
     // TTY
     __tty_get :: (state: &os.TTY_State) -> void ---
     __tty_set :: (state: &os.TTY_State) -> bool ---
+    __tty_enter_raw :: () -> bool ---
+    __tty_leave_raw :: () -> bool ---
 
     // Time and sleep
     __time :: () -> u64 ---
+    __monotonic :: () -> i64 ---
 
     // Processes
     __process_spawn   :: (path: str, args: [] str, env: [&] cptr(u8), opts: &os.ProcessSpawnOpts) -> ProcessData ---
     __process_read    :: (handle: ProcessData, buffer: [] u8) -> i32 ---
+    __process_read_stderr :: (handle: ProcessData, buffer: [] u8) -> i32 ---
     __process_write   :: (handle: ProcessData, buffer: [] u8) -> i32 ---
     __process_kill    :: (handle: ProcessData) -> bool ---
-    __process_wait    :: (handle: ProcessData) -> os.ProcessResult ---
+    __process_wait    :: (handle: ProcessData) -> i32 ---
     __process_destroy :: (handle: ProcessData) -> void ---
 
     // Misc
@@ -155,6 +157,33 @@ __start :: () {
         memwatch.enable_in_scope(context.allocator);
     }
 
+    #if #defined(runtime.vars.LEAKCHECK) {
+        use core.alloc.gc
+        gcs := gc.GCState.make();
+        old_allocator := context.allocator;
+        context.allocator = alloc.as_allocator(&gcs);
+        defer {
+            leaked_bytes := 0;
+            leaked_allocs := 0;
+
+            while l := gcs.first; l != null {
+                n := l.next;
+                size := *cast(&u32) (cast([&] u8) l - 8);
+                printf("[LEAK] {} bytes\n", size);
+                leaked_bytes += size;
+                leaked_allocs += 1;
+
+                l = n;
+            }
+
+            if leaked_allocs > 0 {
+                printf("[LEAK] total: {} bytes in {} allocations\n", leaked_bytes, leaked_allocs);
+            }
+
+            __flush_stdio();
+        }
+    }
+
     #if (typeof MAIN_FUNCTION) == #type () -> void { // An error on this line means no 'main.main' was found in your program.
         MAIN_FUNCTION();
 
@@ -169,7 +198,10 @@ __start :: () {
 #if Multi_Threading_Enabled {
     __spawn_thread :: (id: i32, tls_base: rawptr, stack_base: rawptr, func: (data: rawptr) -> void, data: rawptr) -> bool #foreign "onyx_runtime" "__spawn_thread" ---
     __kill_thread  :: (id: i32) -> i32 #foreign "onyx_runtime" "__kill_thread" ---
+    __join_thread  :: (id: i32) -> i32 #foreign "onyx_runtime" "__join_thread" ---
 
-    #export "_thread_start" _thread_start
-    #export "_thread_exit"  _thread_exit
+    #if runtime.target_type == .Executable {
+        #export "_thread_start" _thread_start
+        #export "_thread_exit"  _thread_exit
+    }
 }

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-C_FILES="library_main astnodes builtins checker clone doc entities errors lex parser types utils wasm_emit extensions "
+C_FILES="library_main astnodes builtins checker clone doc entities errors lex parser types utils wasm_emit wasm_obj wasm_obj_write extensions pb compilation_data "
 LIBS="-lpthread -ldl -lm"
 INCLUDES="-I./include -I../shared/include -I../shared/include/dyncall"
 
@@ -29,7 +29,20 @@ if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
             ;;
 
         wasmer)
-            wasmer_lib="$(wasmer config --libdir || echo $WASMER_LIB_PATH)"
+            # `wasmer config --libdir` only works when the CLI can run. Cross
+            # builds and older runners set WASMER_LIB_PATH to a downloaded archive.
+            wasmer_lib=""
+            if command -v wasmer >/dev/null 2>&1; then
+                wasmer_lib="$(wasmer config --libdir 2>/dev/null || true)"
+            fi
+            if [ -z "$wasmer_lib" ]; then
+                wasmer_lib="${WASMER_LIB_PATH:-}"
+            fi
+            if [ -z "$wasmer_lib" ] || [ ! -f "$wasmer_lib/libwasmer.a" ]; then
+                echo "error: libwasmer.a not found (looked in '${wasmer_lib:-<unset>}')"
+                echo "Install Wasmer or set WASMER_LIB_PATH to the directory containing libwasmer.a."
+                exit 1
+            fi
             LIBS="$wasmer_lib/libwasmer.a $LIBS"
             ;;
 
@@ -42,7 +55,7 @@ fi
 
 case "$ONYX_ARCH" in
     *darwin*)
-        LIBS="$LIBS -lffi -framework CoreFoundation -framework SystemConfiguration"
+        LIBS="$LIBS -lffi -framework CoreFoundation -framework SystemConfiguration -framework Security"
         LIBRARY_BUILD_ARGS="-install_name @rpath/libonyx.dylib"
         AUTOCOMPILER_BUILD_ARGS="-rpath @loader_path/"
         ;;
@@ -70,14 +83,14 @@ for c_file in $(echo "$C_FILES" | sed 's/ /\n/g;s/\([a-zA-Z_0-9]*\)\n/src\/\1.c\
     $ONYX_CC $FLAGS $INCLUDES -fPIC -o $(basename $c_file).o -c $c_file
 done
 
+echo "Compiling onyx executable"
+$ONYX_CC $INCLUDES $FLAGS *.o cli/main.c -o onyx $LIBS
+
 FLAGS=""
 if [ ! -z ${ONYX_TARGET+x} ]; then
     FLAGS="$FLAGS --target=$ONYX_TARGET"
 fi
 $ONYX_CC -shared -fPIC $FLAGS -o "libonyx.$suffix" *.o $LIBS $LIBRARY_BUILD_ARGS
-
-echo "Compiling onyx executable"
-$ONYX_CC $INCLUDES $FLAGS cli/main.c *.o -o onyx $LIBS
 
 # It does seem possible to allow for the CLI to directly
 # use the shared library, but it was causing some weird

@@ -1,5 +1,18 @@
 package runtime.vars
 
-#if !#defined(link_options)  {
-    link_options :: Link_Options.{}
+#if runtime == .Wasip2 || #defined(Component_Build) {
+    // standard32 component modules export their memory under this name
+    // and do not export the indirect function table.
+    link_options :: Link_Options.{
+        export_memory = true,
+        export_memory_name = "cm32p2_memory",
+        export_func_table = false,
+        import_memory = false,
+    }
+}
+
+#if runtime != .Wasip2 && !#defined(Component_Build) {
+    #if !#defined(link_options) {
+        link_options :: Link_Options.{}
+    }
 }

@@ -42,6 +42,17 @@ typedef enum onyx_option_t {
     ONYX_OPTION_COLLECT_PERF,
 
     ONYX_OPTION_PLATFORM,
+
+    /// Lex and parse only: skip type checking, code generation, and
+    /// loading compiler builtins/core. `onyx_inject_code` already
+    /// parses immediately; this option is for `onyx_pump` after
+    /// `onyx_include_file` / inject, so `#load` is parsed without a
+    /// full compile.
+    ONYX_OPTION_PARSE_ONLY,
+
+    ONYX_OPTION_JIT,
+
+    ONYX_OPTION_EMIT_WASM_OBJECT,
 } onyx_option_t;
 
 typedef enum onyx_pump_t {
@@ -55,6 +66,7 @@ typedef enum onyx_platform_t {
     ONYX_PLATFORM_WASI   = 2,
     ONYX_PLATFORM_JS     = 3,
     ONYX_PLATFORM_CUSTOM = 4,
+    ONYX_PLATFORM_WASIP2 = 5,
 } onyx_platform_t;
 
 typedef enum onyx_error_t {
@@ -137,8 +149,15 @@ API void onyx_add_defined_var(onyx_context_t *ctx, char *variable, int32_t varia
 API void onyx_include_file(onyx_context_t *ctx, char *filename, int32_t length);
 API void onyx_add_mapped_dir(onyx_context_t *ctx, char *mapped_name, int32_t mapped_length, char *dir, int32_t dir_length);
 
-/// Directly injects Onyx code as a new compilation unit
+/// Directly injects Onyx code as a new compilation unit.
+/// The buffer is copied; `filename` is used in diagnostics.
+/// Pass NULL / 0 for filename to use "(injected)".
 API void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length);
+API void onyx_inject_code_as(onyx_context_t *ctx, char *filename, int32_t filename_length, uint8_t *code, int32_t length);
+
+/// Prefer this buffer when `#load` / `onyx_include_file` opens `filename`.
+/// The path is matched on the full resolved name or a suffix. Copied.
+API void onyx_overlay_file(onyx_context_t *ctx, char *filename, int32_t filename_length, uint8_t *code, int32_t length);
 
 //
 // Errors 
@@ -162,6 +181,16 @@ API int32_t onyx_output_length(onyx_context_t *ctx, onyx_output_type_t type);
 API void    onyx_output_write(onyx_context_t *ctx, onyx_output_type_t type, void *buffer);
 
 //
+// Compilation events (protobuf CompilerEvents)
+//
+// First write is the full log so far. Later writes are only events since the last
+// write. length does not advance the cursor; write does.
+//
+
+API int32_t onyx_compilation_events_length(onyx_context_t *ctx);
+API void    onyx_compilation_events_write(onyx_context_t *ctx, void *buffer);
+
+//
 // Compilation Info
 //
 
@@ -173,8 +202,8 @@ API const char *onyx_stat_filepath(onyx_context_t *ctx, int32_t file_index);
 // Running WASM
 //
 
-API void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv);
-API void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path);
+API void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv, int32_t jit_enabled);
+API void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path, int32_t jit_enabled);
 
 #endif
 

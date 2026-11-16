@@ -1,0 +1,30 @@
+use core {*}
+
+main :: () {
+    key := "ONYX_TEST_ENV_UNIQUE";
+    println(os.setenv(key, "hello"));
+    switch os.env(key) {
+        case .None do println("");
+        case .Some as v {
+            defer str.free(v);
+            println(v);
+        }
+    }
+
+    vars := os.env_vars();
+    println(vars->has(key));
+    got := vars->get(key) ?? "";
+    println(got);
+
+    println(os.unsetenv(key));
+    missing := os.env(key);
+    println(missing == .None);
+
+    // PATH is almost always present on native and WASI.
+    path := os.env("PATH");
+    println((path ?? "").count > 0);
+    switch path {
+        case .None {}
+        case .Some as p do str.free(p);
+    }
+}

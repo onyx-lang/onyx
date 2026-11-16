@@ -1,0 +1,206 @@
+package witgen
+
+use core {*}
+
+parse_core :: (s: str) -> Core_Ty {
+    if s == "i32" do return .I32;
+    if s == "i64" do return .I64;
+    if s == "f32" do return .F32;
+    if s == "f64" do return .F64;
+    die(tprintf("unknown core type '{}'", s));
+    return .I32;
+}
+
+skip_ws :: (s: str, i: i32) -> i32 {
+    while i < s.count {
+        c := s[i];
+        if c != ' ' && c != '\n' && c != '\r' && c != '\t' do break;
+        i += 1;
+    }
+    return i;
+}
+
+parse_number :: (s: str, i: i32) -> (i32, i32) {
+    i = skip_ws(s, i);
+    n := 0;
+    any := false;
+    while i < s.count && s[i] >= '0' && s[i] <= '9' {
+        n = n * 10 + cast(i32) (s[i] - '0');
+        i += 1;
+        any = true;
+    }
+    if !any do die("expected a number in dummy WAT");
+    return n, i;
+}
+
+parse_quoted :: (s: str, i: i32) -> (str, i32) {
+    i = skip_ws(s, i);
+    if i >= s.count || s[i] != '"' do die("expected a quoted string in dummy WAT");
+    i += 1;
+    buf: dyn_str;
+    while i < s.count && s[i] != '"' {
+        if s[i] == '\\' && i + 1 < s.count {
+            i += 1;
+            buf << s[i];
+        } else {
+            buf << s[i];
+        }
+        i += 1;
+    }
+    if i >= s.count || s[i] != '"' do die("unterminated string in dummy WAT");
+    return str.copy(buf), i + 1;
+}
+
+parse_core_list :: (s: str, i: i32) -> ([..] Core_Ty, i32) {
+    out: [..] Core_Ty;
+    i = skip_ws(s, i);
+    while i < s.count && s[i] != ')' {
+        i = skip_ws(s, i);
+        if i >= s.count || s[i] == ')' do break;
+        start := i;
+        while i < s.count && s[i] != ' ' && s[i] != ')' && s[i] != '\n' {
+            i += 1;
+        }
+        word := s[start .. i];
+        out << parse_core(word);
+        i = skip_ws(s, i);
+    }
+    return out, i;
+}
+
+// Parse `(param ...)` / `(result ...)` groups inside a func type. `i` points at '('.
+parse_func_sig :: (s: str, i: i32) -> (Sig, i32) {
+    sig: Sig;
+    while true {
+        i = skip_ws(s, i);
+        if i >= s.count do break;
+        if s[i] != '(' do break;
+        if str.starts_with(s[i .. s.count], "(param") {
+            i += 6;
+            sig.params, i = parse_core_list(s, i);
+            i = skip_ws(s, i);
+            if i < s.count && s[i] == ')' do i += 1;
+        } elseif str.starts_with(s[i .. s.count], "(result") {
+            i += 7;
+            sig.results, i = parse_core_list(s, i);
+            i = skip_ws(s, i);
+            if i < s.count && s[i] == ')' do i += 1;
+        } else do break;
+    }
+    return sig, i;
+}
+
+parse_dummy_wat :: (text: str) {
+    wat_imports.count = 0;
+    wat_exports.count = 0;
+
+    // Type table, then imports, then exports. Func index -> sig is recovered
+    // from `(func (;N;) (type T)` and from import func indices.
+    type_sigs: [..] Sig;
+    func_sigs: [..] Sig;
+
+    i := 0;
+    while true {
+        at := str.index_of(text[i .. text.count], "(type (;");
+        if at < 0 do break;
+        i = i + at;
+        i += 8; // length of "(type (;"
+        n, i2 := parse_number(text, i);
+        i = i2;
+        func_at := str.index_of(text[i .. text.count], "(func");
+        if func_at < 0 do die("type has no func");
+        i = i + func_at + 5;
+        sig, i3 := parse_func_sig(text, i);
+        i = i3;
+        while type_sigs.count <= n {
+            empty: Sig;
+            type_sigs << empty;
+        }
+        type_sigs[n] = sig;
+    }
+
+    i = 0;
+    while true {
+        at := str.index_of(text[i .. text.count], "(import \"");
+        if at < 0 do break;
+        i = i + at + 8; // at the opening quote
+        i -= 1;
+        module, i2 := parse_quoted(text, i);
+        i = i2;
+        name, i3 := parse_quoted(text, i);
+        i = i3;
+        type_at := str.index_of(text[i .. text.count], "(type ");
+        if type_at < 0 do die("import has no type");
+        i = i + type_at + 6;
+        type_n, i4 := parse_number(text, i);
+        i = i4;
+        if type_n < 0 || type_n >= type_sigs.count do die("import type out of range");
+        sym: Wat_Sym;
+        sym.module = module;
+        sym.name = name;
+        sym.sig = type_sigs[type_n];
+        wat_imports << sym;
+    }
+
+    i = 0;
+    while true {
+        at := str.index_of(text[i .. text.count], "(export \"");
+        if at < 0 do break;
+        i = i + at + 8;
+        i -= 1;
+        name, i2 := parse_quoted(text, i);
+        i = i2;
+        rest := text[i .. text.count];
+        func_at := str.index_of(rest, "(func ");
+        mem_at := str.index_of(rest, "(memory");
+        if func_at >= 0 && (mem_at < 0 || func_at < mem_at) {
+            j := i + func_at + 6;
+            func_n, j2 := parse_number(text, j);
+            // The signature is filled in after func bodies are scanned.
+            sym: Wat_Sym;
+            sym.name = name;
+            sym.module = tprintf("{}", func_n);
+            sym.module = str.copy(sym.module);
+            wat_exports << sym;
+            i = j2;
+        } else {
+            // memory or table export; skip
+            nl := str.index_of(text[i .. text.count], "\n");
+            if nl < 0 do break;
+            i = i + nl + 1;
+        }
+    }
+
+    i = 0;
+    while true {
+        at := str.index_of(text[i .. text.count], "(func (;");
+        if at < 0 do break;
+        i = i + at + 8;
+        func_n, i2 := parse_number(text, i);
+        i = i2;
+        lim := i + 80;
+        if lim > text.count do lim = text.count;
+        type_at := str.index_of(text[i .. lim], "(type ");
+        if type_at < 0 do continue;
+        j := i + type_at + 6;
+        type_n, _ := parse_number(text, j);
+        if type_n >= 0 && type_n < type_sigs.count {
+            while func_sigs.count <= func_n {
+                empty: Sig;
+                func_sigs << empty;
+            }
+            func_sigs[func_n] = type_sigs[type_n];
+        }
+    }
+
+    for idx in 0 .. wat_exports.count {
+        func_n := 0;
+        name := wat_exports[idx].module;
+        for k in 0 .. name.count {
+            func_n = func_n * 10 + cast(i32) (name[k] - '0');
+        }
+        if func_n < 0 || func_n >= func_sigs.count do die(tprintf("export '{}' refers to unknown func {}", wat_exports[idx].name, func_n));
+        wat_exports[idx].sig = func_sigs[func_n];
+        wat_exports[idx].module = "";
+    }
+}

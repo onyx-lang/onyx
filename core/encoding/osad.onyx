@@ -2,9 +2,8 @@ package core.encoding.osad
 #allow_stale_code
 
 use core.io
-use core.string
-use core.array
 use core.memory
+use core.array {Untyped_Array}
 use runtime
 
 use runtime {
@@ -25,7 +24,7 @@ serialize :: #match #local {}
 
 #overload
 serialize :: (v: any) -> ? [] u8 {
-    writer, stream := io.string_builder();
+    writer, stream := io.Writer.string_builder();
     defer cfree(stream);
 
     if !serialize(any.{v.data, v.type}, &writer) {
@@ -54,7 +53,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
             }
 
             // Output the raw bytes of the primitive type.
-            io.write_str(w, str.{ v.data, info.size });
+            io.Writer.write_str(w, str.{ v.data, info.size });
         }
 
         case .Function {
@@ -75,22 +74,28 @@ serialize :: (v: any, w: &io.Writer) -> bool {
 
         case .Slice, .Dynamic_Array {
             if v.type == str {
-                untyped_slice := cast(&array.Untyped_Array, v.data);
+                untyped_slice := cast(&Untyped_Array, v.data);
                 base: [&] u8 = untyped_slice.data;
                 count:       = untyped_slice.count;
                 output_u32(w, count);
-                io.write_str(w, str.{ base, count });
+                io.Writer.write_str(w, str.{ base, count });
                 break;
             }
 
             s_info := cast(&type_info.Type_Info_Slice, info);
 
-            untyped_slice := cast(&array.Untyped_Array, v.data);
+            untyped_slice := cast(&Untyped_Array, v.data);
             base: [&] u8 = untyped_slice.data;
             count:       = untyped_slice.count;
-            elem_size := type_info.size_of(s_info.of);
+            elem_info := type_info.get_type_info(s_info.of);
 
             output_u32(w, count);
+            if elem_info.kind == .Basic && elem_info.size == 1 {
+                // Fast path for writing `[] u8`
+                io.Writer.write_str(w, str.{ base, count });
+            }
+
+            elem_size := type_info.size_of(s_info.of);
             for count {
                 try(serialize(any.{base + elem_size * it, s_info.of}, w));
             }
@@ -130,7 +135,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
                 case _ do panic("Bad union backing type");
             }
 
-            variant := array.first(u_info.variants, [x](x.tag_value == ~~tag_value));
+            variant := Slice.first(u_info.variants, [x](x.tag_value == ~~tag_value));
 
             if !variant {
                 output_u32(w, 0xffffffff);
@@ -148,7 +153,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
 
     output_u32 :: macro (w: &io.Writer, i: u32) {
         v: u32 = i;
-        io.write_str(w, str.{ ~~&v, 4 });
+        io.Writer.write_str(w, str.{ ~~&v, 4 });
     }
 }
 
@@ -161,7 +166,7 @@ deserialize :: #match #local {}
 
 #overload
 deserialize :: ($T: type_expr, s: str, allocator := context.allocator) -> ?T {
-    reader, stream := io.reader_from_string(s);
+    reader, stream := io.Reader.from_string(s);
     defer cfree(stream);
 
     target: T;
@@ -189,7 +194,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := con
         }
 
         case .Basic {
-            err := io.read_fill_buffer(r, .{ target, info.size });
+            err := io.Reader.read_fill_buffer(r, .{ target, info.size });
             // if err != .None do logf(.Warning, "Deserialize hit end of file.");
             return err == .None;
         }
@@ -217,22 +222,31 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := con
 
         case .Slice, .Dynamic_Array {
             s_info := cast(&type_info.Type_Info_Slice, info);
+            elem_info := type_info.get_type_info(s_info.of);
             elem_size := type_info.size_of(s_info.of);
 
             count := read_u32(r);
 
-            untyped_slice := cast(&array.Untyped_Array, target);
+            untyped_slice := cast(&Untyped_Array, target);
             untyped_slice.count = count;
             untyped_slice.data = raw_alloc(allocator, elem_size * count);
-            memory.set(untyped_slice.data, 0, elem_size * count);
 
             if info.kind == .Dynamic_Array {
                 untyped_slice.capacity = count;
                 untyped_slice.allocator = allocator;
             }
 
-            base: [&] u8 = untyped_slice.data;
+            if count == 0 do break;
 
+            if elem_info.kind == .Basic && elem_info.size == 1 {
+                err := io.Reader.read_fill_buffer(r, .{ untyped_slice.data, count });
+                if err != .None do return false;
+                break;
+            }
+
+            memory.set(untyped_slice.data, 0, elem_size * count);
+
+            base: [&] u8 = untyped_slice.data;
             for count {
                 try(deserialize(base + it * elem_size, s_info.of, r, allocator));
             }
@@ -253,7 +267,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := con
 
             base: [&] u8 = target;
             variant_value := read_u32(r);
-            variant := array.first(u_info.variants, [x](x.tag_value == ~~variant_value));
+            variant := Slice.first(u_info.variants, [x](x.tag_value == ~~variant_value));
             if !variant {
                 memory.set(target, 0, u_info.size);
                 break;
@@ -275,7 +289,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := con
 
     read_u32 :: macro (r: &io.Reader) -> u32 {
         dest: u32;
-        io.read_fill_buffer(r, str.{~~&dest, 4});
+        io.Reader.read_fill_buffer(r, str.{~~&dest, 4});
         return dest;
     }
 }

@@ -5,11 +5,9 @@ package core.net
 }
 
 use core.thread
-use core.array
 use core.memory
 use core.alloc
 use core.os
-use core.iter
 use runtime
 
 // Should TCP_Connection be an abstraction of both the client and the server?
@@ -86,7 +84,7 @@ TCP_Connection.iter_close :: (use conn: &TCP_Connection) {
         raw_free(event_allocator, it.data)
     }
 
-    array.clear(&events)
+    Array.clear(&events)
 }
 
 
@@ -167,7 +165,7 @@ tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> &TCP_S
 
     server.client_count = 0
     server.clients = make([] ? TCP_Server.Client, max_clients, allocator=allocator)
-    array.fill(server.clients, .None)
+    Slice.fill(server.clients, .None)
 
     return server
 }
@@ -199,33 +197,32 @@ tcp_server_pulse :: (use server: &TCP_Server) -> bool {
     //
     // Check for new connection
     if client_count < clients.count {
-        socket->accept().Ok->with([client_data] {
+        if socket->accept().Ok as client_data {
             client := Slice.first(clients, [cl](cl.None))
             if !client {
                 client_data.socket->close()
-                break
+            } else {
+                *client = TCP_Server.Client.{}
+                cl := client->unwrap_ptr()
+                cl.server = server
+                cl.state = .Alive
+                cl.socket = client_data.socket
+                cl.address = client_data.addr
+
+                server.client_count += 1
+
+                conn_event := new(TCP_Event.Connection, allocator=server.event_allocator)
+                conn_event.address = &cl.address
+                conn_event.client = cl
+
+                server.events << .{ .Connection, conn_event }
             }
-
-            *client = TCP_Server.Client.{}
-            cl := client->unwrap_ptr()
-            cl.server = server
-            cl.state = .Alive
-            cl.socket = client_data.socket
-            cl.address = client_data.addr
-
-            server.client_count += 1
-
-            conn_event := new(TCP_Event.Connection, allocator=server.event_allocator)
-            conn_event.address = &cl.address
-            conn_event.client = cl
-
-            server.events << .{ .Connection, conn_event }
-        })
+        }
     }
 
     // 
     // Process dead clients
-    for& maybe_client in clients do maybe_client.*->with([client] {
+    for& maybe_client in clients do if maybe_client.* as client {
         switch client.state {
             case .Being_Killed {
                 // Before, there was not a "being killed" state and the code made
@@ -247,7 +244,7 @@ tcp_server_pulse :: (use server: &TCP_Server) -> bool {
                 server.client_count -= 1
             }
         }
-    })
+    }
 
     if client_count == 0 {
         // Wait for a client to connect.

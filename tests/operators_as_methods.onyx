@@ -22,4 +22,16 @@ main :: () {
         case .{0, 0} ---
         case .{1, 2} do println("Working!");
     }
+
+    Vec :: struct {
+        x, y: i32;
+
+        __add :: (a, b: Vec) -> Vec {
+            return .{ a.x + b.x, a.y + b.y };
+        }
+    }
+
+    v := Vec.{1, 2};
+    v += Vec.{3, 4};
+    printf("{} {}\n", v.x, v.y);
 }

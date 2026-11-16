@@ -1,0 +1,8 @@
+roundtrip_a
+true
+roundtrip_b
+true
+a_omits_b
+true
+roundtrip_none
+true

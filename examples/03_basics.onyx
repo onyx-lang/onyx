@@ -19,14 +19,14 @@ main :: () {
     // If you look in core/builtin.onyx, you can see the definition for some
     // of these types in terms of other types. Let's look at some of those types.
 
-    // A pointer in Onyx is written as ^<type>. This is read as 'a pointer to a <type>'.
+    // A pointer in Onyx is written as &<type>. This is read as 'a pointer to a <type>'.
     //
-    // Here foo is an i32. The unary prefix ^ operator takes the address of a value.
-    // The type of foo_ptr is ^i32, or a pointer to an i32. Another example of a pointer
-    // is the cstr builtin. It is ^u8, which is what C would call a char*.
+    // Here foo is an i32. The unary prefix & operator takes the address of a value.
+    // The type of foo_ptr is &i32, or a pointer to an i32. Another example of a pointer
+    // is the cstr builtin. It is &u8, which is what C would call a char*.
     //
     foo     := 10;
-    foo_ptr := ^foo;
+    foo_ptr := &foo;
 
     core.printf("foo is {}\n", foo);
     core.printf("foo_ptr is {}\n", foo_ptr);
@@ -92,11 +92,11 @@ main :: () {
     // just how many elements are currently in the array. To facilitate using dynamic
     // arrays, there are many procedures in the core.array package. Take this example.
     dyn_arr : [..] i32;
-    core.array.init(^dyn_arr);
-    defer core.array.free(^dyn_arr);
+    Array.init(&dyn_arr);
+    defer Array.free(&dyn_arr);
 
     for i in 0 .. 10 {
-        core.array.push(^dyn_arr, i * i * i);
+        Array.push(&dyn_arr, i * i * i);
     }
 
     core.printf("dyn_arr is {}\n", dyn_arr);

@@ -1,0 +1,318 @@
+package runtime.component.abi
+
+use runtime
+use core {*}
+use core.encoding.utf8
+use core.intrinsics.wasm {
+    unreachable,
+    reinterpret_f32,
+    reinterpret_i32,
+    reinterpret_f64,
+    reinterpret_i64,
+}
+
+// Canonical ABI helpers for 32-bit component guests.
+// cm32p2_realloc and cm32p2_initialize are the names wasm-tools
+// standard32 expects on the core module.
+
+uintptr :: #type u32
+
+initialized: bool
+
+ptr_u32 :: (p: rawptr) -> u32 {
+    if p == null do return 0;
+    return cast(u32) cast(uintptr) p;
+}
+
+u32_ptr :: (v: u32) -> rawptr {
+    return cast(rawptr) cast(uintptr) v;
+}
+
+trap :: () {
+    unreachable();
+}
+
+load_u8 :: (addr: u32) -> u8 {
+    v: u8 = 0;
+    memory.copy(&v, u32_ptr(addr), 1);
+    return v;
+}
+
+load_u16 :: (addr: u32) -> u16 {
+    v: u16 = 0;
+    memory.copy(&v, u32_ptr(addr), 2);
+    return v;
+}
+
+load_u32 :: (addr: u32) -> u32 {
+    v: u32 = 0;
+    memory.copy(&v, u32_ptr(addr), 4);
+    return v;
+}
+
+load_u64 :: (addr: u32) -> u64 {
+    v: u64 = 0;
+    memory.copy(&v, u32_ptr(addr), 8);
+    return v;
+}
+
+load_i8 :: (addr: u32) -> i8 {
+    return cast(i8) load_u8(addr);
+}
+
+load_i16 :: (addr: u32) -> i16 {
+    return cast(i16) load_u16(addr);
+}
+
+load_i32 :: (addr: u32) -> i32 {
+    return cast(i32) load_u32(addr);
+}
+
+load_i64 :: (addr: u32) -> i64 {
+    return cast(i64) load_u64(addr);
+}
+
+load_f32 :: (addr: u32) -> f32 {
+    v: f32 = 0;
+    memory.copy(&v, u32_ptr(addr), 4);
+    return v;
+}
+
+load_f64 :: (addr: u32) -> f64 {
+    v: f64 = 0;
+    memory.copy(&v, u32_ptr(addr), 8);
+    return v;
+}
+
+load_bool :: (addr: u32) -> bool {
+    b := load_u8(addr);
+    if b > 1 do trap();
+    return b == 1;
+}
+
+store_u8 :: (addr: u32, v: u8) {
+    tmp := v;
+    memory.copy(u32_ptr(addr), &tmp, 1);
+}
+
+store_u16 :: (addr: u32, v: u16) {
+    tmp := v;
+    memory.copy(u32_ptr(addr), &tmp, 2);
+}
+
+store_u32 :: (addr: u32, v: u32) {
+    tmp := v;
+    memory.copy(u32_ptr(addr), &tmp, 4);
+}
+
+store_u64 :: (addr: u32, v: u64) {
+    tmp := v;
+    memory.copy(u32_ptr(addr), &tmp, 8);
+}
+
+store_i8 :: (addr: u32, v: i8) {
+    store_u8(addr, cast(u8) v);
+}
+
+store_i16 :: (addr: u32, v: i16) {
+    store_u16(addr, cast(u16) v);
+}
+
+store_i32 :: (addr: u32, v: i32) {
+    store_u32(addr, cast(u32) v);
+}
+
+store_i64 :: (addr: u32, v: i64) {
+    store_u64(addr, cast(u64) v);
+}
+
+store_f32 :: (addr: u32, v: f32) {
+    tmp := v;
+    memory.copy(u32_ptr(addr), &tmp, 4);
+}
+
+store_f64 :: (addr: u32, v: f64) {
+    tmp := v;
+    memory.copy(u32_ptr(addr), &tmp, 8);
+}
+
+store_bool :: (addr: u32, v: bool) {
+    b: u8 = 0;
+    if v do b = 1;
+    store_u8(addr, b);
+}
+
+zext_i32 :: (v: i32) -> i64 {
+    return cast(i64) cast(u64) cast(u32) v;
+}
+
+f32_as_i32 :: (v: f32) -> i32 {
+    return reinterpret_f32(v);
+}
+
+i32_as_f32 :: (v: i32) -> f32 {
+    return reinterpret_i32(v);
+}
+
+f64_as_i64 :: (v: f64) -> i64 {
+    return reinterpret_f64(v);
+}
+
+i64_as_f64 :: (v: i64) -> f64 {
+    return reinterpret_i64(v);
+}
+
+check_char :: (c: u32) {
+    if !utf8.valid_rune(cast(i32) c) do trap();
+}
+
+utf8_ok :: (p: rawptr, len: i32) -> bool {
+    if len < 0 do return false;
+    if len == 0 do return true;
+    s := str.{ cast([&] u8) p, len };
+    while s.count > 0 {
+        r, n := utf8.decode_rune(s);
+        if n <= 0 do return false;
+        if r == utf8.Rune_Error && n == 1 do return false;
+        s = str.advance(s, n);
+    }
+    return true;
+}
+
+initialize :: () {
+    if initialized do return;
+    initialized = true;
+    runtime.__runtime_initialize();
+    context.thread_id = 0;
+}
+
+#export "cm32p2_initialize" initialize
+
+realloc :: (old_ptr: u32, old_size: u32, align: u32, new_size: u32) -> u32 {
+    if !initialized do initialize();
+    if align == 0 do align = 1;
+
+    if new_size == 0 {
+        if old_ptr != 0 do raw_free(context.allocator, u32_ptr(old_ptr));
+        return 0;
+    }
+
+    p := raw_alloc(context.allocator, new_size, align);
+    if p == null do trap();
+
+    if old_ptr != 0 && old_size > 0 {
+        n := old_size;
+        if n > new_size do n = new_size;
+        memory.copy(p, u32_ptr(old_ptr), cast(i32) n);
+        raw_free(context.allocator, u32_ptr(old_ptr));
+    }
+
+    return ptr_u32(p);
+}
+
+#export "cm32p2_realloc" realloc
+
+free_bytes :: (p: u32) {
+    if p == 0 do return;
+    raw_free(context.allocator, u32_ptr(p));
+}
+
+alloc_bytes :: (align: u32, size: u32) -> u32 {
+    if size == 0 do return 0;
+    return realloc(0, 0, align, size);
+}
+
+// Return values the host still has to copy out. Freed by the post-return export.
+post_ptrs: [..] u32
+post_marks: [..] i32
+
+post_push :: () {
+    post_marks << post_ptrs.count;
+}
+
+post_add :: (p: u32) {
+    if p == 0 do return;
+    post_ptrs << p;
+}
+
+post_free :: () {
+    if post_marks.count <= 0 do trap();
+    start := post_marks[post_marks.count - 1];
+    post_marks.count -= 1;
+    for i in start .. post_ptrs.count {
+        free_bytes(post_ptrs[i]);
+    }
+    post_ptrs.count = start;
+}
+
+// Temporary ABI buffers for an import call. Freed before the import returns to user code.
+temp_ptrs: [..] u32
+temp_marks: [..] i32
+
+temp_push :: () {
+    temp_marks << temp_ptrs.count;
+}
+
+temp_add :: (p: u32) {
+    if p == 0 do return;
+    temp_ptrs << p;
+}
+
+temp_free :: () {
+    if temp_marks.count <= 0 do trap();
+    start := temp_marks[temp_marks.count - 1];
+    temp_marks.count -= 1;
+    for i in start .. temp_ptrs.count {
+        free_bytes(temp_ptrs[i]);
+    }
+    temp_ptrs.count = start;
+}
+
+note_alloc :: (p: u32, owned: bool) {
+    if owned do post_add(p);
+    else do temp_add(p);
+}
+
+str_ptr :: (s: str) -> i32 {
+    if s.count <= 0 do return 0;
+    return cast(i32) ptr_u32(s.data);
+}
+
+clone_string :: (ptr: u32, len: u32) -> str {
+    if len == 0 do return .{};
+    raw := u32_ptr(ptr);
+    if !utf8_ok(raw, cast(i32) len) do trap();
+    buf := raw_alloc(context.allocator, len);
+    if buf == null do trap();
+    memory.copy(buf, raw, cast(i32) len);
+    return .{ cast([&] u8) buf, cast(i32) len };
+}
+
+take_string :: (ptr: u32, len: u32) -> str {
+    s := clone_string(ptr, len);
+    free_bytes(ptr);
+    return s;
+}
+
+lift_string_at :: (addr: u32) -> str {
+    return take_string(load_u32(addr), load_u32(addr + 4));
+}
+
+store_string :: (addr: u32, s: str, owned: bool) {
+    if s.count <= 0 {
+        store_u32(addr, 0);
+        store_u32(addr + 4, 0);
+        return;
+    }
+
+    if owned {
+        p := alloc_bytes(1, cast(u32) s.count);
+        memory.copy(u32_ptr(p), s.data, s.count);
+        post_add(p);
+        store_u32(addr, p);
+        store_u32(addr + 4, cast(u32) s.count);
+    } else {
+        store_u32(addr, ptr_u32(s.data));
+        store_u32(addr + 4, cast(u32) s.count);
+    }
+}

@@ -186,24 +186,24 @@ SnailNum.magnitude :: (use n: &SnailNum) => {
 }
 
 SnailNum.parse :: (line: &str) -> &SnailNum {
-    string.advance(line);  // [
+    str.advance(line);  // [
 
     root := SnailNum.make();
     if line.data[0] == '[' {
         root->set_left(SnailNum.parse(line));
     } else {
-        root.left_val = ~~ conv.str_to_i64(line);
+        root.left_val = ~~ conv.parse_int(line);
     }
 
-    string.advance(line);  // ,
+    str.advance(line);  // ,
 
     if line.data[0] == '[' {
         root->set_right(SnailNum.parse(line));
     } else {
-        root.right_val = ~~ conv.str_to_i64(line);
+        root.right_val = ~~ conv.parse_int(line);
     }
 
-    string.advance(line); // ]
+    str.advance(line); // ]
 
     return root;
 }
@@ -226,13 +226,13 @@ SnailNum.format :: (output: &conv.Format_Output, s: &conv.Format, use n: &SnailN
 
 
 main :: () {
-    num_arena := arena.make(context.allocator, 256 * 1024);
+    num_arena := arena.Arena.make(context.allocator, 256 * 1024);
     SnailNum.allocator = alloc.as_allocator(&num_arena);
     
     conv.register_custom_formatter(SnailNum.format);
 
-    use file := os.open("./tests/aoc-2021/input/day18.txt")->unwrap();
-    use r := io.reader_make(&file);
+    use file := os.File.open("./tests/aoc-2021/input/day18.txt")->unwrap();
+    use r := io.Reader.make(&file);
 
     #if PART == 1 {
         s: &SnailNum = null;

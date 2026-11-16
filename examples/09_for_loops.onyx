@@ -17,7 +17,7 @@ main :: (args: [] cstr) {
     //      * Custom iterators
 
     // The syntax of for loops is very simple in
-    // for ^? <iteration variable> in <iterator> <block>
+    // for &? <iteration variable> in <iterator> <block>
 
     // For example, this will print out the numbers in the array literal:
     for i in u32.[ 10, 20, 30, 40, 50 ] {
@@ -26,15 +26,15 @@ main :: (args: [] cstr) {
     print("\n\n");
 
 
-    // You may have noticed the options caret (^) in the definition of the for loop
-    // syntax. When a caret is placed before the iteration variable, the iteration
+    // You may have noticed the optional ampersand (&) in the definition of the for loop
+    // syntax. When an ampersand is placed before the iteration variable, the iteration
     // variable will be a *pointer* to the data inside the iterator. This is useful
     // for iterating over larger data structures that don't need to be copied for
     // every iteration, or when you want to modify the elements of the iterator, as
     // so:
 
     primes := u32.[ 2, 3, 5, 7, 11, 13, 17 ];
-    for ^prime in primes {
+    for &prime in primes {
         *prime *= 2;
     }
 
@@ -58,16 +58,16 @@ main :: (args: [] cstr) {
         value: i32 = 10;
 
         //       This is pointer provided to the iterator structure.
-        next :: (v: ^i32) -> (i32, bool) {
+        next :: (v: &i32) -> (i32, bool) {
             defer *v -= 1;
             return *v, *v >= 0;
         }
 
-        close :: (v: ^i32) {
+        close :: (v: &i32) {
             println("Closing the iterator.");
         }
 
-        iterator: Iterator(i32) = .{ data = ^value, next = next, close = close };
+        iterator: Iterator(i32) = .{ data = &value, next = next, close = close };
 
         // Simply use the iterator.
         for v in iterator {

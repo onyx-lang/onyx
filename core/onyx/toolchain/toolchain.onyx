@@ -1,7 +1,9 @@
 package onyx.toolchain
 
 use core { cptr, alloc, memory }
+use core.encoding.protobuf
 use onyx.toolchain.native
+use protobuf.onyx.toolchain.events { CompilerEvents }
 
 TextPosition :: struct {
     line: u32
@@ -45,6 +47,15 @@ Builder.inject_source :: (use self: &#Self, source: str) {
     native.onyx_inject_code(ctx, source)
 }
 
+Builder.inject_source_as :: (use self: &#Self, filename: str, source: str) {
+    native.onyx_inject_code_as(ctx, filename, source)
+}
+
+/// Use `source` instead of the on-disk file when this path is `#load`ed.
+Builder.overlay_file :: (use self: &#Self, filename: str, source: str) {
+    native.onyx_overlay_file(ctx, filename, source)
+}
+
 Builder.set_platform :: (use self: &#Self, platform: native.onyx_platform_t) {
     native.onyx_set_option_int(ctx, .PLATFORM, ~~platform)
 }
@@ -57,7 +68,17 @@ Builder.disable :: (use self: &#Self, option: native.onyx_option_t) {
     native.onyx_set_option_int(ctx, option, 0)
 }
 
+Builder.pump :: (use self: &#Self) -> bool {
+    return native.onyx_pump(ctx) == .CONTINUE
+}
+
 Builder.compile :: (use self: &#Self) {
+    while native.onyx_pump(ctx) == .CONTINUE {}
+}
+
+/// Pump until parse of included/injected sources finishes. Does not typecheck.
+Builder.parse :: (use self: &#Self) {
+    native.onyx_set_option_int(ctx, .PARSE_ONLY, 1)
     while native.onyx_pump(ctx) == .CONTINUE {}
 }
 
@@ -101,11 +122,54 @@ Builder.generate_output :: (
     return buffer
 }
 
+/// Unread compilation events since the last call, decoded as `CompilerEvents`.
+/// The first call returns the full log so far; later calls return only new events.
+/// Append successive results to reconstruct the complete log.
+Builder.compilation_events :: (use self: &#Self, allocator := context.allocator) -> CompilerEvents {
+    length := native.onyx_compilation_events_length(ctx)
+    if length <= 0 {
+        return .{}
+    }
+
+    buffer := make([] u8, length)
+    defer delete(&buffer)
+
+    native.onyx_compilation_events_write(ctx, buffer.data)
+    return protobuf.unmarshal(buffer, CompilerEvents, allocator)!
+}
+
+/// Snapshot of unread compilation events as a new index.
+/// The first call is the log so far; later calls are only the delta.
+/// For a running index, `make` once and `update_compilation_info`.
+Builder.compilation_info :: (use self: &#Self, allocator := context.allocator) -> CompilationInfo {
+    info := CompilationInfo.make(allocator)
+    self->update_compilation_info(&info, allocator)
+    return info
+}
+
+/// Fold unread compilation events into an existing index.
+Builder.update_compilation_info :: (use self: &#Self, info: &CompilationInfo, allocator := context.allocator) -> u32 {
+    length := native.onyx_compilation_events_length(ctx)
+    if length <= 0 do return 0
+
+    buffer := make([] u8, length, allocator=allocator)
+    native.onyx_compilation_events_write(ctx, buffer.data)
+
+    before := info.events_applied
+    switch info->ingest_protobuf(buffer, copy_payload=false) {
+        case .Ok {}
+        case .Err {
+            return 0
+        }
+    }
+    return info.events_applied - before
+}
 
 
 
 
-run_wasm :: (wasm_bytes: [] u8, args: [] str) {
+
+run_wasm :: (wasm_bytes: [] u8, args: [] str, jit_enabled := 0) {
     argv := alloc.array_from_stack(cptr(u8), args.length)
     for v, i in args {
         argv[i] = cptr.make(v.data)
@@ -116,10 +180,10 @@ run_wasm :: (wasm_bytes: [] u8, args: [] str) {
     // Consider use cases that might want to capture stdio
     // of the "embedded" wasm process?
 
-    native.onyx_run_wasm(wasm_bytes, argv.length, argv.data)
+    native.onyx_run_wasm(wasm_bytes, argv.length, argv.data, jit_enabled)
 }
 
-run_wasm_with_debug :: (wasm_bytes: [] u8, args: [] str, debug_socket_path: [] str) {
+run_wasm_with_debug :: (wasm_bytes: [] u8, args: [] str, debug_socket_path: [] str, jit_enabled := 0) {
     argv := alloc.array_from_stack(cptr(u8), args.length)
     for v, i in args {
         argv[i] = cptr.make(v.data)
@@ -129,6 +193,6 @@ run_wasm_with_debug :: (wasm_bytes: [] u8, args: [] str, debug_socket_path: [] s
     memory.set(socket, 0, debug_socket_path.length + 1)
     memory.copy(socket, debug_socket_path.data, debug_socket_path.length)
 
-    native.onyx_run_wasm_with_debug(wasm_bytes, argv.length, argv.data, socket)
+    native.onyx_run_wasm_with_debug(wasm_bytes, argv.length, argv.data, socket, jit_enabled)
 }
 

@@ -1,9 +1,9 @@
-
-
 use core {*}
 
-main :: (args: [] cstr) {
-    ba := bucket_array.make(i32, 4);
+// @leak-check
+
+main :: () {
+    ba := Bucket_Array.make(i32, 4);
     for i in 24 do ba << i;
 
     printf("ba[10] is {}.\n", ba[10]);
@@ -19,4 +19,5 @@ main :: (args: [] cstr) {
     }
 
     printf("Sum is {}\n", sum);
+    delete(&ba);
 }

@@ -3,6 +3,12 @@
 #include "utils.h"
 #include "errors.h"
 
+#if defined(_MSC_VER)
+     #define ONYX_THREAD_LOCAL __declspec(thread)
+ #else
+     #define ONYX_THREAD_LOCAL __thread
+ #endif
+
 static const char* token_type_names[] = {
     "UNKNOWN",
     "the end of file",
@@ -129,20 +135,26 @@ static inline b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, 
 }
 
 const char *token_type_name(TokenType tkn_type) {
-    static char hack_tmp_buffer[32];
-    if (tkn_type < Token_Type_Ascii_End) {
+    static ONYX_THREAD_LOCAL char hack_tmp_buffer[32];
+    // Compare as unsigned so a signed-char token (byte >= 128) cannot
+    // index token_type_names off the end.
+    if ((u32) tkn_type < (u32) Token_Type_Ascii_End) {
         bh_snprintf(hack_tmp_buffer, 31, "%c", (char) tkn_type);
         return hack_tmp_buffer;
-    } else {
-        return token_type_names[tkn_type - Token_Type_Ascii_End];
     }
+
+    u32 index = (u32) tkn_type - (u32) Token_Type_Ascii_End;
+    if (index >= (u32) (Token_Type_Count - Token_Type_Ascii_End)) {
+        return "unknown token";
+    }
+    return token_type_names[index];
 }
 
 const char* token_name(OnyxToken * tkn) {
     TokenType tkn_type = tkn->type;
 
     if (tkn_type == Token_Type_Symbol) {
-        static char hack_tmp_buffer[512];
+        static ONYX_THREAD_LOCAL char hack_tmp_buffer[512];
         bh_snprintf(hack_tmp_buffer, 511, "%b", tkn->text, tkn->length);
         return hack_tmp_buffer;
     }
@@ -151,9 +163,14 @@ const char* token_name(OnyxToken * tkn) {
 }
 
 void token_toggle_end(OnyxToken* tkn) {
-    static char backup = 0;
+    static ONYX_THREAD_LOCAL char backup = 0;
+    if (!tkn || !tkn->text || tkn->length < 0) return;
+
     char tmp = tkn->text[tkn->length];
-    assert(backup == '\0' || tmp == '\0'); // Sanity check
+    // Unpaired toggles used to abort. Skip the write so a bad token
+    // from partial input cannot take down the process.
+    if (backup != '\0' && tmp != '\0') return;
+
     tkn->text[tkn->length] = backup;
     backup = tmp;
 }
@@ -176,6 +193,8 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
                     semicolon_token.pos.filename = tokenizer->filename;
                     semicolon_token.pos.line = tokenizer->line_number;
                     semicolon_token.pos.column = (u16)(tokenizer->curr - tokenizer->line_start) + 1;
+                    semicolon_token.pos.file_id = tokenizer->file_id;
+                    semicolon_token.atom = 0;
                     bh_arr_push(tokenizer->tokens, semicolon_token);
                     tokenizer->insert_semicolon = 0;
                 }
@@ -198,6 +217,8 @@ whitespace_skipped:
     tk.pos.filename = tokenizer->filename;
     tk.pos.line = tokenizer->line_number;
     tk.pos.column = (u16)(tokenizer->curr - tokenizer->line_start) + 1;
+    tk.pos.file_id = tokenizer->file_id;
+    tk.atom = 0;
 
     if (tokenizer->curr == tokenizer->end) {
         tk.type = Token_Type_End_Stream;
@@ -210,7 +231,12 @@ whitespace_skipped:
             tk.type = Token_Type_Comment;
 
             tokenizer->curr += 2;
-            while (*tokenizer->curr++ != '\n' && tokenizer->curr != tokenizer->end);
+            while (tokenizer->curr < tokenizer->end && *tokenizer->curr != '\n') {
+                tokenizer->curr++;
+            }
+            if (tokenizer->curr < tokenizer->end && *tokenizer->curr == '\n') {
+                tokenizer->curr++;
+            }
 
             tk.length = tokenizer->curr - tk.text;
             goto token_parsed;
@@ -560,7 +586,7 @@ whitespace_skipped:
     }
 
 
-    tk.type = (TokenType) *tokenizer->curr;
+    tk.type = (TokenType) (unsigned char) *tokenizer->curr;
     INCREMENT_CURR_TOKEN(tokenizer);
 
 token_parsed:
@@ -608,6 +634,7 @@ OnyxTokenizer onyx_tokenizer_create(Context *context, bh_file_contents *fc) {
         .end            = bh_pointer_add(fc->data, fc->length),
 
         .filename       = fc->filename,
+        .file_id        = 0,
 
         .line_number    = 1,
         .line_start     = fc->data,

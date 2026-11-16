@@ -12,134 +12,134 @@ write_type_name :: (writer: &io.Writer, t: type_expr) {
             basic := cast(&Type_Info_Basic) info;
 
             switch basic.basic_kind {
-                case .Void do io.write_str(writer, "void");
-                case .Bool do io.write_str(writer, "bool");
-                case .U8   do io.write_str(writer, "u8");
-                case .I8   do io.write_str(writer, "i8");
-                case .U16  do io.write_str(writer, "u16");
-                case .I16  do io.write_str(writer, "i16");
-                case .U32  do io.write_str(writer, "u32");
-                case .I32  do io.write_str(writer, "i32");
-                case .U64  do io.write_str(writer, "u64");
-                case .I64  do io.write_str(writer, "i64");
+                case .Void do io.Writer.write_str(writer, "void");
+                case .Bool do io.Writer.write_str(writer, "bool");
+                case .U8   do io.Writer.write_str(writer, "u8");
+                case .I8   do io.Writer.write_str(writer, "i8");
+                case .U16  do io.Writer.write_str(writer, "u16");
+                case .I16  do io.Writer.write_str(writer, "i16");
+                case .U32  do io.Writer.write_str(writer, "u32");
+                case .I32  do io.Writer.write_str(writer, "i32");
+                case .U64  do io.Writer.write_str(writer, "u64");
+                case .I64  do io.Writer.write_str(writer, "i64");
 
-                case .F32  do io.write_str(writer, "f32");
-                case .F64  do io.write_str(writer, "f64");
+                case .F32  do io.Writer.write_str(writer, "f32");
+                case .F64  do io.Writer.write_str(writer, "f64");
 
-                case .Rawptr do io.write_str(writer, "rawptr");
+                case .Rawptr do io.Writer.write_str(writer, "rawptr");
 
-                case .I8X16 do io.write_str(writer, "i8x16");
-                case .I16X8 do io.write_str(writer, "i16x8");
-                case .I32X4 do io.write_str(writer, "i32x4");
-                case .I64X2 do io.write_str(writer, "i64x2");
-                case .F32X4 do io.write_str(writer, "f32x4");
-                case .F64X2 do io.write_str(writer, "f64x2");
-                case .V128  do io.write_str(writer, "v128");
+                case .I8X16 do io.Writer.write_str(writer, "i8x16");
+                case .I16X8 do io.Writer.write_str(writer, "i16x8");
+                case .I32X4 do io.Writer.write_str(writer, "i32x4");
+                case .I64X2 do io.Writer.write_str(writer, "i64x2");
+                case .F32X4 do io.Writer.write_str(writer, "f32x4");
+                case .F64X2 do io.Writer.write_str(writer, "f64x2");
+                case .V128  do io.Writer.write_str(writer, "v128");
 
-                case .Type_Index do io.write_str(writer, "type_expr");
-                case .Unsized_Int do io.write_str(writer, "<unsized int>");
-                case .Unsized_Float do io.write_str(writer, "<unsized float>");
+                case .Type_Index do io.Writer.write_str(writer, "type_expr");
+                case .Unsized_Int do io.Writer.write_str(writer, "<unsized int>");
+                case .Unsized_Float do io.Writer.write_str(writer, "<unsized float>");
             }
         }
 
         case .Pointer {
             pointer := cast(&Type_Info_Pointer) info;
-            io.write_str(writer, "&");
+            io.Writer.write_str(writer, "&");
             write_type_name(writer, pointer.to);
         }
 
         case .Multi_Pointer {
             pointer := cast(&Type_Info_Multi_Pointer) info;
-            io.write_str(writer, "[&] ");
+            io.Writer.write_str(writer, "[&] ");
             write_type_name(writer, pointer.to);
         }
 
         case .Array {
             arr := cast(&Type_Info_Array) info;
-            io.write_format(writer, "[{}] ", arr.count);
+            io.Writer.write_format(writer, "[{}] ", arr.count);
             write_type_name(writer, arr.of);
         }
 
         case .Slice {
             slice := cast(&Type_Info_Slice) info;
-            io.write_str(writer, "[] ");
+            io.Writer.write_str(writer, "[] ");
             write_type_name(writer, slice.of);
         }
 
         case .Dynamic_Array {
             dyn := cast(&Type_Info_Dynamic_Array) info;
-            io.write_str(writer, "[..] ");
+            io.Writer.write_str(writer, "[..] ");
             write_type_name(writer, dyn.of);
         }
 
         case .Variadic_Argument {
             va := cast(&Type_Info_Variadic_Argument) info;
-            io.write_str(writer, "..");
+            io.Writer.write_str(writer, "..");
             write_type_name(writer, va.of);
         }
 
         case .Enum {
             e := cast(&Type_Info_Enum) info;
-            io.write_str(writer, e.name);
+            io.Writer.write_str(writer, e.name);
         }
 
         case .Struct {
             s := cast(&Type_Info_Struct) info;
-            if s.name.count > 0 do io.write_str(writer, s.name);
-            else                do io.write_str(writer, "<anonymous struct>");
+            if s.name.count > 0 do io.Writer.write_str(writer, s.name);
+            else                do io.Writer.write_str(writer, "<anonymous struct>");
         }
 
         case .Polymorphic_Struct {
             s := cast(&Type_Info_Polymorphic_Struct) info;
-            if s.name.count > 0 do io.write_str(writer, s.name);
-            else                do io.write_str(writer, "<anonymous polymorphic struct>");
+            if s.name.count > 0 do io.Writer.write_str(writer, s.name);
+            else                do io.Writer.write_str(writer, "<anonymous polymorphic struct>");
         }
 
         case .Union {
             u := cast(&Type_Info_Union) info;
-            if u.name.count > 0 do io.write_str(writer, u.name);
-            else                do io.write_str(writer, "<anonymous union>");
+            if u.name.count > 0 do io.Writer.write_str(writer, u.name);
+            else                do io.Writer.write_str(writer, "<anonymous union>");
         }
 
         case .Polymorphic_Union {
             u := cast(&Type_Info_Polymorphic_Union) info;
-            if u.name.count > 0 do io.write_str(writer, u.name);
-            else                do io.write_str(writer, "<anonymous polymorphic union>");
+            if u.name.count > 0 do io.Writer.write_str(writer, u.name);
+            else                do io.Writer.write_str(writer, "<anonymous polymorphic union>");
         }
 
         case .Compound {
             comp := cast(&Type_Info_Compound) info;
-            io.write_str(writer, "(");
+            io.Writer.write_str(writer, "(");
 
             i := 0;
             for type in comp.components {
-                if i != 0 do io.write_str(writer, ", ");
+                if i != 0 do io.Writer.write_str(writer, ", ");
 
                 write_type_name(writer, type);
                 i += 1;
             }
-            io.write_str(writer, ")");
+            io.Writer.write_str(writer, ")");
         }
 
         case .Function {
             f := cast(&Type_Info_Function) info;
-            io.write_str(writer, "(");
+            io.Writer.write_str(writer, "(");
 
             i := 0;
             for type in f.parameter_types {
-                if i != 0 do io.write_str(writer, ", ");
+                if i != 0 do io.Writer.write_str(writer, ", ");
 
                 write_type_name(writer, type);
                 i += 1;
             }
-            io.write_str(writer, ") -> ");
+            io.Writer.write_str(writer, ") -> ");
 
             write_type_name(writer, f.return_type);
         }            
 
         case .Distinct {
             d := cast(&Type_Info_Distinct) info;
-            io.write_str(writer, d.name);
+            io.Writer.write_str(writer, d.name);
         }
     }
 }
@@ -327,7 +327,7 @@ get_struct_method :: (type: type_expr, method_name: str) -> &any {
     info := cast(&Type_Info_Struct) get_type_info(type);
     if info.kind != .Struct do return null;
 
-    method := core.array.first(info.methods, [x](x.name == method_name));
+    method := Slice.first(info.methods, [x](x.name == method_name));
     if method != null do return &method.func;
     return null;
 }

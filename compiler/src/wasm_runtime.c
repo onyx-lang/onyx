@@ -81,6 +81,13 @@ typedef struct LinkLibraryContext {
 
 static void *locate_symbol_in_dynamic_library_raw(char *libname, char *sym) {
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    /* Native exes statically link onyx_runtime; resolve it without a dylib. */
+    void *self = dlopen(NULL, RTLD_LAZY);
+    if (self) {
+        void *from_exe = dlsym(self, sym);
+        if (from_exe) return from_exe;
+    }
+
     void* handle = dlopen(libname, RTLD_LAZY);
     if (handle == NULL) {
         printf("dlopen(): %s\n", dlerror());
@@ -223,11 +230,23 @@ typedef struct DynCallContext {
     char types[64];
 } DynCallContext;
 
+static int dyncall_wasm_arg_count(const char *types) {
+    int count = 0;
+    for (int i = 1; types[i]; i++) {
+        count += types[i] == 's' ? 2 : 1;
+    }
+    return count;
+}
+
 static wasm_trap_t *__wasm_dyncall(void *env, const wasm_val_vec_t *args, wasm_val_vec_t *res) {
     DynCallContext *ctx = env;
     dcReset(dcCallVM);
 
+    // An aggregate return is a leading wasm pointer that the type string
+    // does not list. Skip it so the remaining arguments stay aligned.
     int arg_idx = 0;
+    if ((int) args->size == dyncall_wasm_arg_count(ctx->types) + 1) arg_idx = 1;
+
     for (int i = 1; i < 64; i++) {
         switch (ctx->types[i]) {
             case '\0': goto arguments_placed;
@@ -403,7 +422,7 @@ static char *lookup_func_name_in_name_section(u32 funcidx, i32 name_section, i32
 
             if (idx == funcidx) {
                 *out_len = len;
-                return &wasm_raw_bytes.data[cursor];
+                return (char *) &wasm_raw_bytes.data[cursor];
             }
 
             cursor += len;
@@ -589,7 +608,7 @@ static b32 link_wasm_imports(
     return 1;
 }
 
-void onyx_run_initialize(b32 debug_enabled, const char *debug_socket) {
+void onyx_run_initialize(b32 debug_enabled, const char *debug_socket, b32 jit_enabled) {
     wasm_config = wasm_config_new();
     if (!wasm_config) {
         cleanup_wasm_objects();
@@ -599,6 +618,11 @@ void onyx_run_initialize(b32 debug_enabled, const char *debug_socket) {
 #ifdef USE_OVM_DEBUGGER
     void wasm_config_enable_debug(wasm_config_t *config, int value);
     wasm_config_enable_debug(wasm_config, debug_enabled);
+
+    if (jit_enabled) {
+        void wasm_config_enable_jit(wasm_config_t *config, int value);
+        wasm_config_enable_jit(wasm_config, 1);
+    }
 
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         i32 getpid();
@@ -619,6 +643,7 @@ void onyx_run_initialize(b32 debug_enabled, const char *debug_socket) {
 #endif
 
 #ifndef USE_OVM_DEBUGGER
+    (void) jit_enabled;
     if (debug_enabled) {
         printf("Warning: --debug does nothing if libovmwasm.so is not being used!\n");
     }

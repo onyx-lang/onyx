@@ -21,10 +21,53 @@ unmarshal :: (input: [] u8, $type: type_expr, allocator := context.allocator) ->
 
     #context_scope {
         context.allocator = allocator
-        parse_message(input, &val, type)?
+        parse_message(input, &val, type, true)?
     }
 
     return .{ Ok = ~~ val }
+}
+
+/// Decode the next length-delimited message on `field_number`.
+/// Returns `true` if `out` was filled, `false` if the stream is exhausted.
+/// If `copy_strings` is false, `str`/`[] u8` fields alias `data`; the caller
+/// must keep those bytes alive.
+unmarshal_next_message :: (data: &[] u8, field_number: i32, out: rawptr, type: type_expr, copy_strings := false) -> Result(bool, Unmarshal_Error) {
+    while data.length > 0 {
+        field_header := parse_field_header(data)?
+        if field_header.encoding_type == .SGROUP || field_header.encoding_type == .EGROUP {
+            continue
+        }
+
+        field_value := parse_field_value(data, field_header.encoding_type)?
+        if field_header.proto_number != field_number do continue
+
+        parse_message(field_value.bytes!, out, type, copy_strings)?
+        return .{ Ok = true }
+    }
+
+    return .{ Ok = false }
+}
+
+/// Decode a stream of length-delimited messages on `field_number` without
+/// allocating the outer repeated array. The body is inlined at the call site.
+/// Pass a Code block with one capture (`[ev] { ... }`); that capture is `&type`.
+///
+/// String fields alias `input`. Keep `input` alive for as long as those
+/// strings are used.
+unmarshal_each :: macro (
+    input: [] u8,
+    field_number: i32,
+    $type: type_expr,
+    $body: Code
+) {
+    data := input
+
+    while data {
+        item: type
+        found := #this_package.unmarshal_next_message(&data, field_number, &item, type, false)?
+        if !found do break
+        #unquote body(&item) #scope(body)
+    }
 }
 
 
@@ -41,11 +84,12 @@ _Field_Value :: union {
 }
 
 
-parse_message :: (input: [] u8, out: rawptr, type: type_expr) -> Result(bool, Unmarshal_Error) {
+parse_message :: (input: [] u8, out: rawptr, type: type_expr, copy_strings: bool) -> Result(bool, Unmarshal_Error) {
     data := input
-    msg_desc := lookup_protobuf_descriptor(type)
-        |> .into_result(Unmarshal_Error.{ Unknown_Type = type })
-        |> .forward_err()
+    desc_ptr := lookup_protobuf_descriptor(type)
+    if desc_ptr == null do return .{ Err = .{ Unknown_Type = type } }
+    // Copy so nested lookups that insert types cannot invalidate this view.
+    msg_desc := *desc_ptr
 
     while data {
         field_header := parse_field_header(&data)?
@@ -53,13 +97,20 @@ parse_message :: (input: [] u8, out: rawptr, type: type_expr) -> Result(bool, Un
             continue
         }
 
-        field_value   := parse_field_value(&data, field_header.encoding_type)?
-        field_desc    := Slice.find_opt(msg_desc.fields, [x](x.proto_field_number == field_header.proto_number)) |> or_continue
+        field_value := parse_field_value(&data, field_header.encoding_type)?
+
+        n := field_header.proto_number
+        if n < 0 || n >= msg_desc.by_number.count do continue
+        slot := msg_desc.by_number[n]
+        if slot <= 0 || slot > msg_desc.fields.count do continue
+        field_desc := &msg_desc.fields[slot - 1]
         field_pointer := memory.ptr_add(out, field_desc.field_offset)
 
         if field_desc.is_optional {
-            // Set the tag to be Some
             *cast(& u8) field_pointer = 1
+            field_pointer = memory.ptr_add(field_pointer, ~~ field_desc.optional_offset)
+        } elseif field_desc.is_oneof {
+            write_union_tag(field_pointer, field_desc.oneof_tag, field_desc.oneof_tag_size)
             field_pointer = memory.ptr_add(field_pointer, ~~ field_desc.optional_offset)
         }
 
@@ -67,7 +118,7 @@ parse_message :: (input: [] u8, out: rawptr, type: type_expr) -> Result(bool, Un
             field_pointer = Array.untyped_alloc_one(~~ field_pointer, field_desc.field_type)
         }
 
-        store_value(field_pointer, &field_desc, field_value)?
+        store_value(field_pointer, field_desc, field_value, copy_strings)?
     }
 
     return .{ Ok = true }
@@ -138,7 +189,7 @@ parse_varint :: (data: &[] u8) -> Result(u64, Unmarshal_Error) {
     return .{ Ok = out }
 }
 
-store_value :: (out: rawptr, desc: &Proto_Field_Descriptor, value: _Field_Value) -> Result(bool, Unmarshal_Error) {
+store_value :: (out: rawptr, desc: &Proto_Field_Descriptor, value: _Field_Value, copy_strings: bool) -> Result(bool, Unmarshal_Error) {
     switch desc.proto_field_type {
         // Some fun type punning here
         case .DOUBLE, .INT64, .UINT64, .FIXED64, .SFIXED64 {
@@ -186,11 +237,16 @@ store_value :: (out: rawptr, desc: &Proto_Field_Descriptor, value: _Field_Value)
         }
 
         case .STRING, .BYTES {
-            *cast(& str) out = str.copy(value.bytes->expect("str should be encoded in len"))
+            raw := value.bytes->expect("str should be encoded in len")
+            if copy_strings {
+                *cast(& str) out = str.copy(raw)
+            } else {
+                *cast(& str) out = raw
+            }
         }
 
         case .MESSAGE {
-            parse_message(value.bytes!, out, desc.field_type)?
+            parse_message(value.bytes!, out, desc.field_type, copy_strings)?
         }
     }
 
@@ -206,7 +262,13 @@ Array.untyped_alloc_one :: (arr: &Untyped_Array, type: type_expr) -> rawptr {
 
     if arr.count >= arr.capacity {
         if arr.capacity == 0 {
-            arr.capacity = 4
+            // Large messages (CompilerEvent is hundreds of bytes) grow in
+            // big chunks so a 70k-event dump does not realloc from 4.
+            if element_size >= 256 {
+                arr.capacity = 4096
+            } else {
+                arr.capacity = 4
+            }
             arr.allocator = context.allocator
         } else {
             arr.capacity <<= 1
@@ -232,4 +294,5 @@ or_continue :: macro (x: ? $T) -> T {
 }
 
 }
+
 
