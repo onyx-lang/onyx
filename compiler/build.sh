@@ -79,18 +79,25 @@ case "$(uname)" in
 esac
 
 echo "Compiling libonyx.$suffix"
+OBJECTS=""
 for c_file in $(echo "$C_FILES" | sed 's/ /\n/g;s/\([a-zA-Z_0-9]*\)\n/src\/\1.c\n/g;s/\n/ /g'); do
-    $ONYX_CC $FLAGS $INCLUDES -fPIC -o $(basename $c_file).o -c $c_file
+    obj="$(basename "$c_file").o"
+    $ONYX_CC $FLAGS $INCLUDES -fPIC -o "$obj" -c "$c_file"
+    OBJECTS="$OBJECTS $obj"
 done
 
+# Keep cli/main.c's DWARF in a real object file. Passing the .c file on the
+# link line compiles it to a temporary object that is gone before dsymutil runs.
+$ONYX_CC $FLAGS $INCLUDES -fPIC -o cli_main.o -c cli/main.c
+
 echo "Compiling onyx executable"
-$ONYX_CC $INCLUDES $FLAGS *.o cli/main.c -o onyx $LIBS
+$ONYX_CC $INCLUDES $FLAGS $OBJECTS cli_main.o -o onyx $LIBS
 
 FLAGS=""
 if [ ! -z ${ONYX_TARGET+x} ]; then
     FLAGS="$FLAGS --target=$ONYX_TARGET"
 fi
-$ONYX_CC -shared -fPIC $FLAGS -o "libonyx.$suffix" *.o $LIBS $LIBRARY_BUILD_ARGS
+$ONYX_CC -shared -fPIC $FLAGS -o "libonyx.$suffix" $OBJECTS $LIBS $LIBRARY_BUILD_ARGS
 
 # It does seem possible to allow for the CLI to directly
 # use the shared library, but it was causing some weird
@@ -119,4 +126,18 @@ $ONYX_CC -shared -fPIC $FLAGS $INCLUDES \
 #
 # ar rcs libonyx.a *.o
 
-rm *.o
+# On macOS, -g leaves DWARF in the .o files and only a debug map in the Mach-O.
+# LLDB can show source only from a dSYM (or those objects). Link the dSYM while
+# the objects still exist; it has to sit next to whichever onyx binary is launched.
+if [ "$1" = "debug" ] && [ "$(uname)" = "Darwin" ]; then
+    echo "Generating onyx.dSYM"
+    DSYMUTIL="dsymutil"
+    if [ -x /usr/bin/dsymutil ]; then
+        DSYMUTIL="/usr/bin/dsymutil"
+    fi
+    $DSYMUTIL onyx || exit 1
+elif [ "$(uname)" = "Darwin" ]; then
+    rm -rf onyx.dSYM
+fi
+
+rm -f *.o

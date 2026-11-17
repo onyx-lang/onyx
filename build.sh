@@ -91,6 +91,15 @@ copy_required() {
     cp "$src" "$dest"
 }
 
+# LLDB finds debug info for a Mach-O only in a sibling bundle: bin/onyx.dSYM.
+install_onyx_debug_symbols() {
+    dest_bin="$1"
+    [ "$(uname)" = "Darwin" ] || return 0
+    [ -d compiler/onyx.dSYM ] || return 0
+    rm -rf "${dest_bin}.dSYM"
+    cp -R compiler/onyx.dSYM "${dest_bin}.dSYM"
+}
+
 # True when compiler/onyx is an ELF for a machine other than the host.
 # Linux aarch64 CI cross-compiles on x86_64, then has to run that compiler
 # to produce tools/wit-bindgen.wasm.
@@ -164,6 +173,7 @@ package_all() {
     echo "Installing core tools"
     mkdir -p "$DIST_DIR/bin"
     copy_required compiler/onyx "$DIST_DIR/bin/"
+    install_onyx_debug_symbols "$DIST_DIR/bin/onyx"
     copy_required compiler/libonyx.$suffix "$DIST_DIR/lib/"
     copy_required compiler/onyx_autocompiler.$suffix "$DIST_DIR/lib/"
     copy_required "shared/include/onyx.h" "$DIST_DIR/include/onyx.h"

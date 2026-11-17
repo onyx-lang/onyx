@@ -90,6 +90,7 @@ char   *onyx_version_runtime() {
 static AstInclude* create_load(Context *context, char* filename, int32_t length);
 static void introduce_defined_variables(Context *context);
 static void create_and_add_defined_variable(Context *context, DefinedVariable *var);
+static void introduce_package_parameters(Context *context);
 static void link_wasm_module(Context *context);
 static void __library_code_entry(onyx_context_t *ctx);
 
@@ -356,7 +357,7 @@ static b32 process_load_entity(Context *context, Entity* ent) {
             }
             return process_source_file(context, filename);
         }
- 
+
         {
             CompilationFileOverlay *ov = find_file_overlay(context, include->name);
             if (ov) {
@@ -417,6 +418,7 @@ static b32 process_entity(Context *context, Entity* ent) {
                 initialize_builtins(context);
                 introduce_build_options(context);
                 introduce_defined_variables(context);
+                introduce_package_parameters(context);
             }
 
             // GROSS
@@ -921,6 +923,17 @@ void onyx_add_defined_var(onyx_context_t *ctx, char *variable, int32_t variable_
     }));
 }
 
+void onyx_supply_package_parameter(onyx_context_t *ctx, char *param_path, int32_t param_path_length, char *value, int32_t value_length) {
+    __library_code_entry(ctx);
+    if (param_path_length < 0) param_path_length = strlen(param_path);
+    if (value_length      < 0) value_length      = strlen(value);
+
+    bh_arr_push(ctx->context.supplied_package_parameters, ((DefinedVariable) {
+        .key   = bh_strdup_len(ctx->context.ast_alloc, param_path, param_path_length),
+        .value = bh_strdup_len(ctx->context.ast_alloc, value, value_length),
+    }));
+}
+
 //
 // Loading code
 //
@@ -1165,7 +1178,7 @@ int32_t onyx_output_length(onyx_context_t *ctx, onyx_output_type_t type) {
     case ONYX_OUTPUT_TYPE_JS:
         ensure_js_has_been_generated(ctx);
         return ctx->context.generated_js_buffer.length;
-    
+
     case ONYX_OUTPUT_TYPE_ODOC:
         ensure_odoc_has_been_generated(ctx);
         return ctx->context.generated_odoc_buffer.length;
@@ -1342,6 +1355,96 @@ static void create_and_add_defined_variable(Context *context, DefinedVariable *v
     binding->node = (AstNode *) value_node;
 
     add_entities_for_node(&context->entities, NULL, (AstNode *) binding, p->scope, p);
+}
+
+typedef Table(bh_arr(PackageParam)) Package_Param_Table;
+
+static void introduce_package_parameters(Context *context) {
+    // Group package parameters by package name
+    // For each package:
+    //     create AstPackageParameters
+    //     supply PackageParams
+    //     submit the entity
+
+    Package_Param_Table package_params = NULL;
+    sh_new_arena(package_params);
+
+    OnyxFilePos cli_file_pos;
+    cli_file_pos.filename = "(CLI parameter)";
+    cli_file_pos.line = 1;
+    cli_file_pos.column = 1;
+    Scope *cli_dummy_scope = scope_create(context, context->global_scope, cli_file_pos);
+
+    bh_arr_each(DefinedVariable, param, context->supplied_package_parameters) {
+        char *package_name = bh_strdup(context->ast_alloc, param->key);
+        char *tmp = package_name + bh_max(bh_strlen(package_name), 0);
+        while (tmp != package_name && *tmp != '.') tmp--;
+        *tmp = 0;
+
+        i32 last_dot_offset = tmp - package_name;
+        char *param_name = package_name + last_dot_offset + 1;
+
+        bh_file_contents file_contents;
+        file_contents.allocator = context->ast_alloc;
+        file_contents.data = param->value;
+        file_contents.length = bh_strlen(param->value);
+        file_contents.filename = bh_aprintf(context->ast_alloc, "(CLI parameter)");
+
+        OnyxTokenizer tokenizer = onyx_tokenizer_create(context, &file_contents);
+        onyx_lex_tokens(&tokenizer);
+
+        OnyxParser parser = onyx_parser_create(context, &tokenizer);
+
+        AstTyped *result = onyx_parse_expression(&parser, cli_dummy_scope);
+        if (parser.hit_unexpected_token || result == NULL) {
+            continue;
+        }
+        result = NULL;
+        result->type = NULL;
+
+        onyx_parser_free(&parser);
+
+        OnyxToken *name_token = bh_alloc_item(context->ast_alloc, OnyxToken);
+        name_token->pos = cli_file_pos;
+        name_token->text = param_name;
+        name_token->length = bh_strlen(param_name);
+
+        u32 name_atom = token_atom(context, name_token);
+
+        PackageParam param = { 0 };
+        param.name = name_token;
+        param.name_atom = name_atom;
+        param.expr = result;
+
+        bh_arr(PackageParam) this_package_params = NULL;
+        i32 package_index = 0;
+        if ((package_index = shgeti(package_params, package_name)) != -1) {
+            this_package_params = package_params[package_index].value;
+        }
+
+        bh_arr_push(this_package_params, param);
+
+        shput(package_params, package_name, this_package_params);
+    }
+
+    fori (i, 0, shlen(package_params)) {
+        Package_Param_Table pp = &package_params[i];
+
+        OnyxToken *package_token = bh_alloc_item(context->ast_alloc, OnyxToken);
+        package_token->pos = cli_file_pos;
+        package_token->text = "";
+        package_token->length = 0;
+
+        AstPackageParameters *node = onyx_ast_node_new(context->ast_alloc, sizeof(AstPackageParameters), Ast_Kind_Package_Parameters);
+        node->token = package_token;
+        node->is_provider = 1;
+        node->package_name = bh_strdup(context->ast_alloc,pp->key);
+        node->params = pp->value;
+
+        add_entities_for_node(&context->entities, NULL, (AstNode *) node, cli_dummy_scope, NULL);
+    }
+
+    shfree(package_params);
 }
 
 

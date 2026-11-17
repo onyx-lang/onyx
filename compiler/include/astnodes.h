@@ -2109,7 +2109,7 @@ struct Package {
     b32 is_included_somewhere : 1;
     b32 parameters_blocking : 1;
     b32 parameters_ready : 1;
-    b32 submitted_live_entity : 1;
+    // b32 submitted_live_entity : 1;
 };
 
 typedef enum CompileAction CompileAction;
@@ -2559,11 +2559,11 @@ typedef struct CompilationLog {
 } CompilationLog;
 
 struct Context {
-    Table(Package *)      packages;
+    EntityHeap entities;
+
+    Table(Package *)               packages;
     bh_arr(AstPackageParameters *) package_parameter_defs;
     bh_arr(AstPackageParameters *) package_parameter_providers;
-
-    EntityHeap            entities;
 
     Scope *global_scope;
 
@@ -2589,6 +2589,7 @@ struct Context {
 
     bh_arr(bh_file_contents) loaded_files;
     bh_arr(DefinedVariable) defined_variables;
+    bh_arr(DefinedVariable) supplied_package_parameters;
 
     // Unsaved editor buffers. process_source_file preferes these over disk.
     bh_arr(CompilationFileOverlay) file_overlays;

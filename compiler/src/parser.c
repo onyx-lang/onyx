@@ -108,7 +108,7 @@ void submit_entity_in_scope(OnyxParser* parser, AstNode* node, Scope* scope, Pac
     }
 
     add_entities_for_node(&parser->context->entities, NULL, node, scope, package);
-    if (package) package->submitted_live_entity = 1;
+    // if (package) package->submitted_live_entity = 1;
 }
 
 // Parsing Utilities
@@ -4793,13 +4793,9 @@ static char *parse_dotted_package_name(OnyxParser *parser) {
 static void parse_package_parameter_definition(OnyxParser *parser, OnyxToken *token) {
     Package *package = parser->package;
     b32 duplicate = package->parameter_def != NULL;
-    b32 too_late = package->submitted_live_entity;
 
     if (duplicate) {
         ONYX_ERROR(token->pos, Error_Critical, "Package '%s' already has a #package_parameters definition.", package->name);
-    }
-    if (too_late) {
-        ONYX_ERROR(token->pos, Error_Critical, "#package_parameters must appear before other declarations in package '%s'.", package->name);
     }
 
     AstPackageParameters *node = make_node(AstPackageParameters, Ast_Kind_Package_Parameters);
@@ -4857,7 +4853,7 @@ static void parse_package_parameter_definition(OnyxParser *parser, OnyxToken *to
         expect_token(parser, '}');
     }
 
-    if (duplicate || too_late || parser->hit_unexpected_token) return;
+    if (duplicate || parser->hit_unexpected_token) return;
 
     package->parameter_def = node;
     remember_package_parameter_def(parser, node);
@@ -4872,11 +4868,6 @@ static void parse_package_parameter_definition(OnyxParser *parser, OnyxToken *to
 static void parse_package_parameter_provider(OnyxParser *parser, OnyxToken *token) {
     char *package_name = parse_dotted_package_name(parser);
     if (package_name == NULL || parser->hit_unexpected_token) return;
-
-    b32 targets_current = parser->package && parser->package->name && strcmp(package_name, parser->package->name) == 0;
-    if (targets_current) {
-        ONYX_ERROR(token->pos, Error_Critical, "Package '%s' cannot provide its own parameters.", package_name);
-    }
 
     // The provider is only an entity here. Static if keeps both branches, and
     // only the branch that is checked claims the package. Registering now
@@ -4918,7 +4909,7 @@ static void parse_package_parameter_provider(OnyxParser *parser, OnyxToken *toke
         expect_token(parser, ',');
     }
 
-    if (targets_current || parser->hit_unexpected_token) return;
+    if (parser->hit_unexpected_token) return;
 
     ENTITY_SUBMIT(node);
 }

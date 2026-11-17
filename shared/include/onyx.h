@@ -123,7 +123,7 @@ API onyx_pump_t onyx_pump(onyx_context_t *ctx);
 
 //
 // Events
-// 
+//
 
 API int32_t           onyx_event_count(onyx_context_t *ctx);
 API onyx_event_type_t onyx_event_type(onyx_context_t *ctx, int event_idx);
@@ -137,7 +137,12 @@ API const char       *onyx_event_field_str(onyx_context_t *ctx, int event_idx, c
 API int32_t onyx_set_option_cstr(onyx_context_t *ctx, onyx_option_t opt, char *value);
 API int32_t onyx_set_option_bytes(onyx_context_t *ctx, onyx_option_t opt, char *value, int32_t length);
 API int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t value);
+
+//
+// Package Parameters
+//
 API void onyx_add_defined_var(onyx_context_t *ctx, char *variable, int32_t variable_length, char *value, int32_t value_length);
+API void onyx_supply_package_parameter(onyx_context_t *ctx, char *param_path, int32_t param_path_length, char *value, int32_t value_length);
 
 //
 // Loading code
@@ -160,7 +165,7 @@ API void onyx_inject_code_as(onyx_context_t *ctx, char *filename, int32_t filena
 API void onyx_overlay_file(onyx_context_t *ctx, char *filename, int32_t filename_length, uint8_t *code, int32_t length);
 
 //
-// Errors 
+// Errors
 //
 
 API int32_t       onyx_error_count(onyx_context_t *ctx);
@@ -206,4 +211,3 @@ API void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **arg
 API void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path, int32_t jit_enabled);
 
 #endif
-

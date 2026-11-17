@@ -71,6 +71,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     C_LBLUE "    -o, --output " C_GREY "target_file    " C_NORM "Specify the target file " C_GREY "(default: %s)\n"
     C_LBLUE "    -r, --runtime " C_GREY "runtime       " C_NORM "Specifies the runtime " C_GREY "(onyx, wasi, wasip2, js, custom)\n"
     C_LBLUE "    --map-dir " C_GREY "name:folder       " C_NORM "Adds a mapped directory\n"
+    C_LBLUE "    --param " C_GREY "pack.param=value    " C_NORM "Provide a package parameter\n"
     "\n"
     C_LBLUE "    --debug                     " C_NORM "Output a debugable build\n"
     C_LBLUE "    --jit                       " C_NORM "Use the OVM native backend when running\n"
@@ -480,6 +481,20 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
             }
 
             onyx_add_defined_var(ctx, key, key_len, value, value_len);
+        }
+        else if (!strcmp(argv[i], "--param")) {
+            char *arg = argv[++i];
+            int len = strnlen(arg, 4096);
+
+            i32 j=0;
+            while (arg[j] != '=' && j < len) j++;
+
+            char    *key = arg;
+            int32_t  key_len = j;
+            char    *value = arg + j + 1;
+            int32_t  value_len = len - j - 1;
+
+            onyx_supply_package_parameter(ctx, key, key_len, value, value_len);
         }
         else if (!strcmp(argv[i], "-r") || !strcmp(argv[i], "--runtime")) {
             using_onyx_runtime = 0;

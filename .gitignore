@@ -24,6 +24,7 @@ bin/onyx-run
 bin/onyx
 releases/
 compiler/onyx
+compiler/onyx.dSYM/
 compiler/libonyx.so
 compiler/libonyx.dylib
 compiler/libonyx.dll
