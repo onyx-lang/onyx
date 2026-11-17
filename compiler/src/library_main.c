@@ -1399,8 +1399,6 @@ static void introduce_package_parameters(Context *context) {
         if (parser.hit_unexpected_token || result == NULL) {
             continue;
         }
-        result = NULL;
-        result->type = NULL;
 
         onyx_parser_free(&parser);
 
