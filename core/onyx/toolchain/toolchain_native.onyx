@@ -96,6 +96,7 @@ onyx_context_t :: #distinct u64
     onyx_set_option_bytes :: (ctx: onyx_context_t, opt: onyx_option_t, value: str) -> i32 ---
     onyx_set_option_int :: (ctx: onyx_context_t, opt: onyx_option_t, value: i32) -> i32 ---
     onyx_add_defined_var :: (ctx: onyx_context_t, variable: str, value: str) -> void ---
+    onyx_supply_package_parameter :: (ctx: onyx_context_t, param: str, value: str) -> void ---
     onyx_include_file :: (ctx: onyx_context_t, filename: str) -> void ---
     onyx_add_mapped_dir :: (ctx: onyx_context_t, mapped_name: str, dir: str) -> void ---
     onyx_inject_code :: (ctx: onyx_context_t, code: str) -> void ---
@@ -131,4 +132,3 @@ use runtime
 } else {
     #library "onyx_autocompiler"
 }
-

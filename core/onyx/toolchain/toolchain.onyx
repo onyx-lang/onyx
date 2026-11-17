@@ -60,6 +60,10 @@ Builder.set_platform :: (use self: &#Self, platform: native.onyx_platform_t) {
     native.onyx_set_option_int(ctx, .PLATFORM, ~~platform)
 }
 
+Builder.supply_package_parameter :: (use self: &#Self, param: [] u8, value: [] u8) {
+    native.onyx_supply_package_parameter(ctx, param, value)
+}
+
 Builder.enable :: (use self: &#Self, option: native.onyx_option_t) {
     native.onyx_set_option_int(ctx, option, 1)
 }
@@ -195,4 +199,3 @@ run_wasm_with_debug :: (wasm_bytes: [] u8, args: [] str, debug_socket_path: [] s
 
     native.onyx_run_wasm_with_debug(wasm_bytes, argv.length, argv.data, socket, jit_enabled)
 }
-
