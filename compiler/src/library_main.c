@@ -733,6 +733,16 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
                     return pump_return(context, ONYX_PUMP_CONTINUE);
                 }
 
+                // First stuck cycle, before all-types-checked and stalled hooks.
+                // Optional package parameters take their defaults here. A provider
+                // parsed after that is an error.
+                if (context->cycle_almost_detected == 0 && package_parameters_on_first_stall(context)) {
+                    context->watermarked_node = NULL;
+                    context->highest_watermark = 0;
+                    context->cycle_almost_detected = 0;
+                    return pump_return(context, ONYX_PUMP_CONTINUE);
+                }
+
                 if (context->cycle_almost_detected == 4) {
                     // The all-types-checked event and the stalled-extension
                     // hook already ran on earlier rungs. If a real error is

@@ -99,7 +99,7 @@ void package_reinsert_use_packages(Context *context, Package* package) {
         (*use_package)->state = Entity_State_Check_Types;
         (*use_package)->macro_attempts = 0;
         entity_heap_insert_existing(&context->entities, *use_package);
-    } 
+    }
 
     bh_arr_set_length(package->use_package_entities, 0);
 }
@@ -108,7 +108,7 @@ void package_mark_as_used(Context *context, Package* package) {
     if (!package) return;
     if (package->is_included_somewhere) return;
     package->is_included_somewhere = 1;
-    
+
     bh_arr_each(Entity *, pent, package->buffered_entities) {
         entity_heap_insert_existing(&context->entities, *pent);
     }
@@ -358,7 +358,7 @@ all_types_peeled_off:
             }
 
             return symbol_resolve_atom_no_ascend(package->package->scope, atom);
-        } 
+        }
 
         case Ast_Kind_Foreign_Block:
         case Ast_Kind_Object_Block:
@@ -504,7 +504,7 @@ AstNode* try_symbol_raw_resolve_from_type(Context *context, Type *type, char* sy
     u32 atom = atom_intern(context, symbol);
     i32 ptr_depth = 0;
     while (type && type->kind == Type_Kind_Pointer && ptr_depth++ < 64) {
-        type = type->Pointer.elem; 
+        type = type->Pointer.elem;
     }
     if (!type) return NULL;
 
@@ -645,7 +645,7 @@ void add_overload_option(Context *context, bh_arr(OverloadOption)* poverloads, u
 // overloaded procedures have a strict ordering to their overloads, which determines how the correct
 // match will be found. This was not very complicated until overloaded procedures could be used as
 // overload options. This means that you could create an "infinite loop" of overloads like so:
-// 
+//
 //  o1 :: {                 o2 :: {
 //      (...) { ... },          (...) { ... },
 //      o2                      o1
@@ -749,7 +749,7 @@ AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadO
 
         // NOTE: If the arguments cannot be placed successfully in the parameters list
         if (!fill_in_arguments(context, &args, (AstNode *) overload, NULL, 0)) continue;
-        
+
         VarArgKind va_kind;
         TypeMatch tm = check_arguments_against_type(context, &args, &overload->type->Function, &va_kind, NULL, NULL, NULL);
         if (tm == TYPE_MATCH_SUCCESS) {
@@ -1202,7 +1202,7 @@ void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(Ove
             strncat(arg_str, ", ", 1023);
         }
 
-        bh_arr_each(AstNamedValue *, named_value, call->args.named_values) { 
+        bh_arr_each(AstNamedValue *, named_value, call->args.named_values) {
             token_toggle_end((*named_value)->token);
             strncat(arg_str, (*named_value)->token->text, 1023);
             token_toggle_end((*named_value)->token);
@@ -1254,7 +1254,7 @@ static TypeMatch ensure_overload_returns_correct_type_job(Context *context, void
     AstTyped *node      = data->node;
 
     assert(expected_type && node);
-    
+
     // If the entity on the node has been completed and unused,
     // skip checking this because the function is likely not used.
     if (node->entity && node->entity->state >= Entity_State_Finalized) {
@@ -1873,7 +1873,7 @@ TypeMatch check_arguments_against_type(Context *context, Arguments* args, TypeFu
                         return TYPE_MATCH_FAILED;
                     }
 
-                    arg_arr[arg_pos]->va_kind = VA_Kind_Any; 
+                    arg_arr[arg_pos]->va_kind = VA_Kind_Any;
                     break;
                 }
 
@@ -1945,7 +1945,7 @@ type_checking_done:
 
     return TYPE_MATCH_SUCCESS;
 }
-        
+
 
 
 
@@ -2103,7 +2103,7 @@ all_types_peeled_off:
             if (package->package == NULL) return NULL;
 
             return &package->package->scope;
-        } 
+        }
 
         case Ast_Kind_Foreign_Block: {
             AstForeignBlock* fb = (AstForeignBlock *) node;
@@ -2130,7 +2130,7 @@ all_types_peeled_off:
             if (t) return &t->Slice.scope;
             return NULL;
         }
-        
+
         case Ast_Kind_DynArr_Type: {
             Type *t = type_build_from_ast(context, (AstType *) node);
             if (t) return &t->DynArray.scope;
@@ -2196,7 +2196,7 @@ Scope *get_scope_from_node_or_create(Context *context, AstNode *node) {
     if (!pscope) return NULL;
 
     // Create the scope if it does not exist.
-    // This uses a NULL parent, which I think is what 
+    // This uses a NULL parent, which I think is what
     // is used in other parts of the compiler for struct/enum
     // scopes?
     if (!*pscope) {
@@ -2251,7 +2251,7 @@ char *find_closest_symbol_in_scope(Context *context, Scope *scope, char *sym, u3
         if (node && node->flags & Ast_Flag_Symbol_Invisible) continue;
 
         char *key = (char *) atom_name(context, scope_symbol_atom_at(scope, i));
-        u32 d = levenshtein_distance(context, key, sym); 
+        u32 d = levenshtein_distance(context, key, sym);
         if (d < *out_distance) {
             *out_distance = d;
             closest = (char *) key;
@@ -2263,7 +2263,7 @@ char *find_closest_symbol_in_scope(Context *context, Scope *scope, char *sym, u3
 
 char *find_closest_symbol_in_scope_and_parents(Context *context, Scope *scope, char *sym) {
     u32 min_dist = 0x7fffffff;
-    u32 tmp_dist; 
+    u32 tmp_dist;
 
     char *closest = NULL;
     while (scope != NULL) {
@@ -2278,7 +2278,7 @@ char *find_closest_symbol_in_scope_and_parents(Context *context, Scope *scope, c
 
     return closest;
 }
-        
+
 char *find_closest_symbol_in_node(Context *context, AstNode* node, char *sym) {
     Scope *scope = get_scope_from_node(context, node);
     if (!scope) {
@@ -2304,7 +2304,178 @@ void track_resolution_for_symbol_info(Context *context, AstNode *original, AstNo
     compilation_log_emit_symbol_resolved(context, original, resolved);
 }
 
+AstPackageParameters *find_package_parameter_provider(Context *context, char *name) {
+    if (!name) return NULL;
 
+    bh_arr_each(AstPackageParameters *, slot, context->package_parameter_providers) {
+        AstPackageParameters *node = *slot;
+        if (node && node->package_name && strcmp(node->package_name, name) == 0) return node;
+    }
+    return NULL;
+}
+
+PackageParam *find_package_param(AstPackageParameters *node, u32 name_atom) {
+    bh_arr_each(PackageParam, param, node->params) {
+        if (param->name_atom == name_atom) return param;
+    }
+    return NULL;
+}
+
+void package_parameters_bind(Context *context, Package *package) {
+    AstPackageParameters *def = package ? package->parameter_def : NULL;
+    if (!def || def->applied) return;
+
+    def->applied = 1;
+    package->parameters_blocking = 0;
+    package->parameters_ready = 1;
+
+    AstPackageParameters *prov = find_package_parameter_provider(context, package->name);
+
+    bh_arr_each(PackageParam, param, def->params) {
+        AstTyped *value = NULL;
+        if (prov) {
+            PackageParam *given = find_package_param(prov, param->name_atom);
+            if (given) value = given->expr;
+        }
+        if (!value) value = param->expr;
+        if (!value) {
+            ONYX_ERROR(param->name->pos, Error_Critical, "Package parameter '%s' has no value.", atom_name(context, param->name_atom));
+            continue;
+        }
+
+        AstBinding *binding = onyx_ast_node_new(context->ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
+        binding->token = param->name;
+        binding->flags |= Ast_Flag_Binding_Isnt_Captured;
+        binding->node = package_parameter_bound_node(context, package, param->name, value);
+
+        Entity ent;
+        memset(&ent, 0, sizeof(ent));
+        ent.type = Entity_Type_Binding;
+        ent.state = Entity_State_Introduce_Symbols;
+        ent.binding = binding;
+        ent.scope = package->scope;
+        ent.package = package;
+        entity_heap_insert(&context->entities, ent);
+    }
+
+    bh_arr_each(Entity *, pent, package->parameter_buffered_entities) {
+        entity_heap_insert_existing(&context->entities, *pent);
+    }
+    if (package->parameter_buffered_entities)
+        bh_arr_clear(package->parameter_buffered_entities);
+}
+
+// Turn a checked parameter value into the node a `::` binding would store.
+AstNode *package_parameter_bound_node(Context *context, Package *package, OnyxToken *name, AstTyped *value) {
+    AstNode *node = strip_aliases((AstNode *) value);
+    if (!node) node = (AstNode *) value;
+
+    switch (node->kind) {
+        case Ast_Kind_Function:
+        case Ast_Kind_Polymorphic_Proc: {
+            AstFunction *func = (AstFunction *) node;
+            func->flags &= ~Ast_Flag_Function_Is_Lambda;
+            if (func->intrinsic_name == NULL) func->intrinsic_name = name;
+            if (func->name == NULL) {
+                func->name = generate_name_within_scope(context, package->scope, name);
+                func->assembly_name = func->name;
+            }
+            return node;
+        }
+
+        case Ast_Kind_Macro: {
+            AstFunction *func = (AstFunction *) ((AstMacro *) node)->body;
+            if (func && func->name == NULL)
+                func->name = generate_name_within_scope(context, package->scope, name);
+            return node;
+        }
+
+        case Ast_Kind_Global:
+            if (((AstGlobal *) node)->name == NULL)
+                ((AstGlobal *) node)->name = generate_name_within_scope(context, package->scope, name);
+            return node;
+
+        case Ast_Kind_Interface:
+        case Ast_Kind_Struct_Type:
+        case Ast_Kind_Poly_Struct_Type:
+        case Ast_Kind_Enum_Type:
+        case Ast_Kind_Distinct_Type:
+        case Ast_Kind_Union_Type:
+        case Ast_Kind_Poly_Union_Type:
+            if (((AstStructType *) node)->name == NULL)
+                ((AstStructType *) node)->name = generate_name_within_scope(context, package->scope, name);
+            return node;
+
+        case Ast_Kind_Type_Alias:
+            node->token = name;
+            return node;
+
+        case Ast_Kind_Package:
+        case Ast_Kind_NumLit:
+        case Ast_Kind_StrLit:
+        case Ast_Kind_Overloaded_Function:
+            return node;
+
+        default: break;
+    }
+
+    if (node_is_type(node)) return node;
+
+    AstAlias *alias = onyx_ast_node_new(context->ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
+    alias->token = ((AstNode *) value)->token ? ((AstNode *) value)->token : name;
+    alias->alias = (AstTyped *) node;
+    alias->type = ((AstTyped *) node)->type;
+    alias->flags |= Ast_Flag_Comptime;
+
+    Entity expr_ent;
+    memset(&expr_ent, 0, sizeof(expr_ent));
+    expr_ent.type = Entity_Type_Expression;
+    expr_ent.state = Entity_State_Check_Types;
+    expr_ent.expr = (AstTyped *) alias;
+    expr_ent.scope = package->scope;
+    expr_ent.package = package;
+    entity_heap_insert(&context->entities, expr_ent);
+
+    return (AstNode *) alias;
+}
+
+b32 package_parameters_on_first_stall(Context *context) {
+    b32 inserted = 0;
+
+    bh_arr_each(AstPackageParameters *, slot, context->package_parameter_defs) {
+        AstPackageParameters *def = *slot;
+        if (!def || !def->resolved || def->applied) continue;
+        if (def->entity && def->entity->state == Entity_State_Failed) continue;
+        if (find_package_parameter_provider(context, def->package_name)) continue;
+
+        Package *package = package_lookup(context, def->package_name);
+        if (!package) continue;
+
+        b32 all_optional = 1;
+        bh_arr_each(PackageParam, param, def->params) {
+            if (!param->has_default) all_optional = 0;
+        }
+
+        if (all_optional) {
+            def->defaults_inserted = 1;
+            package_parameters_bind(context, package);
+            inserted = 1;
+        } else {
+            def->unresolved_is_error = 1;
+        }
+    }
+
+    bh_arr_each(AstPackageParameters *, slot, context->package_parameter_providers) {
+        AstPackageParameters *prov = *slot;
+        if (!prov || prov->values_ready) continue;
+
+        Package *package = package_lookup(context, prov->package_name);
+        if (!package || !package->parameter_def)
+            prov->unresolved_is_error = 1;
+    }
+
+    return inserted;
+}
 
 //
 // Compiler Events

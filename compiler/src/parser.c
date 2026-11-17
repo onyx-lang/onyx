@@ -88,15 +88,27 @@ static void parser_depth_leave(OnyxParser *parser) {
 #define BH_INTERNAL_ALLOCATOR (parser->context->gp_alloc)
 
 void submit_entity_in_scope(OnyxParser* parser, AstNode* node, Scope* scope, Package* package) {
-    if (bh_arr_length(parser->alternate_entity_placement_stack) == 0) {
-        add_entities_for_node(&parser->context->entities, NULL, node, scope, package);
-
-    } else {
+    // Captured entities (static if, foreign blocks, object blocks) stay
+    // with their owner. A NULL slot on the stack drops the entity.
+    if (bh_arr_length(parser->alternate_entity_placement_stack) > 0) {
         bh_arr(Entity *) *entity_array = bh_arr_last(parser->alternate_entity_placement_stack);
         if (entity_array) {
             add_entities_for_node(&parser->context->entities, entity_array, node, scope, package);
         }
+        return;
     }
+
+    // The rest of a parameterized package waits until the parameters are bound.
+    if (package && package->parameters_blocking) {
+        if (package->parameter_buffered_entities == NULL) {
+            bh_arr_new(parser->context->gp_alloc, package->parameter_buffered_entities, 16);
+        }
+        add_entities_for_node(&parser->context->entities, &package->parameter_buffered_entities, node, scope, package);
+        return;
+    }
+
+    add_entities_for_node(&parser->context->entities, NULL, node, scope, package);
+    if (package) package->submitted_live_entity = 1;
 }
 
 // Parsing Utilities
@@ -4707,6 +4719,223 @@ static void parse_implicit_injection(OnyxParser* parser) {
 }
 
 
+static void skip_inserted_semicolons(OnyxParser *parser) {
+    while (consume_token_if_next(parser, Token_Type_Inserted_Semicolon)) {}
+}
+
+static void remember_package_parameter_def(OnyxParser *parser, AstPackageParameters *node) {
+    if (parser->context->package_parameter_defs == NULL)
+        bh_arr_new(parser->context->gp_alloc, parser->context->package_parameter_defs, 4);
+    bh_arr_push(parser->context->package_parameter_defs, node);
+}
+
+static void remember_package_parameter_provider(OnyxParser *parser, AstPackageParameters *node) {
+    if (parser->context->package_parameter_providers == NULL)
+        bh_arr_new(parser->context->gp_alloc, parser->context->package_parameter_providers, 4);
+    bh_arr_push(parser->context->package_parameter_providers, node);
+}
+
+static b32 package_param_name_taken(bh_arr(PackageParam) params, u32 name_atom) {
+    bh_arr_each(PackageParam, param, params) {
+        if (param->name_atom == name_atom) return 1;
+    }
+    return 0;
+}
+
+// An inline procedure used as a parameter value should be a named binding,
+// the same way `name :: (ev: Event) {}` clears the lambda flag at parse time.
+static void name_package_parameter_function(OnyxParser *parser, OnyxToken *name, AstTyped *expr) {
+    if (!expr) return;
+    if (expr->kind != Ast_Kind_Function && expr->kind != Ast_Kind_Polymorphic_Proc) return;
+
+    AstFunction *func = (AstFunction *) expr;
+    func->flags &= ~Ast_Flag_Function_Is_Lambda;
+    if (func->intrinsic_name == NULL) func->intrinsic_name = name;
+    if (func->name == NULL) {
+        func->name = generate_name_within_scope(parser->context, parser->package->scope, name);
+        func->assembly_name = func->name;
+    }
+}
+
+static char *parse_dotted_package_name(OnyxParser *parser) {
+    if (parser->curr->type != Token_Type_Symbol) {
+        ONYX_ERROR(parser->curr->pos, Error_Critical, "Expected a package name after #package_parameters.");
+        parser->hit_unexpected_token = 1;
+        return NULL;
+    }
+
+    i32 cap = 64;
+    i32 used = 0;
+    char *name = bh_alloc(parser->context->ast_alloc, cap);
+    name[0] = '\0';
+
+    while (parser->curr->type == Token_Type_Symbol) {
+        if (parser->hit_unexpected_token) return NULL;
+
+        OnyxToken *sym = expect_token(parser, Token_Type_Symbol);
+        i32 need = used + sym->length + 2;
+        if (need > cap) {
+            i32 ncap = cap;
+            while (ncap < need) ncap *= 2;
+            char *grown = bh_alloc(parser->context->ast_alloc, ncap);
+            memcpy(grown, name, (size_t) used);
+            name = grown;
+            cap = ncap;
+        }
+
+        memcpy(name + used, sym->text, (size_t) sym->length);
+        used += sym->length;
+        name[used] = '\0';
+
+        if (!consume_token_if_next(parser, '.')) break;
+
+        name[used++] = '.';
+        name[used] = '\0';
+    }
+
+    return name;
+}
+
+static void parse_package_parameter_definition(OnyxParser *parser, OnyxToken *token) {
+    Package *package = parser->package;
+    b32 duplicate = package->parameter_def != NULL;
+    b32 too_late = package->submitted_live_entity;
+
+    if (duplicate) {
+        ONYX_ERROR(token->pos, Error_Critical, "Package '%s' already has a #package_parameters definition.", package->name);
+    }
+    if (too_late) {
+        ONYX_ERROR(token->pos, Error_Critical, "#package_parameters must appear before other declarations in package '%s'.", package->name);
+    }
+
+    AstPackageParameters *node = make_node(AstPackageParameters, Ast_Kind_Package_Parameters);
+    node->token = token;
+    node->package_name = package->name;
+    bh_arr_new(parser->context->gp_alloc, node->params, 4);
+
+    expect_token(parser, '(');
+    skip_inserted_semicolons(parser);
+
+    while (!consume_token_if_next(parser, ')')) {
+        if (parser->hit_unexpected_token) return;
+        skip_inserted_semicolons(parser);
+        if (consume_token_if_next(parser, ')')) break;
+
+        OnyxToken *name = expect_token(parser, Token_Type_Symbol);
+        if (parser->hit_unexpected_token) return;
+
+        u32 name_atom = token_atom(parser->context, name);
+        if (package_param_name_taken(node->params, name_atom)) {
+            ONYX_ERROR(name->pos, Error_Critical, "Duplicate package parameter '%b'.", name->text, name->length);
+        }
+
+        expect_token(parser, ':');
+        AstType *type_node = parse_type(parser);
+        if (parser->hit_unexpected_token || type_node == NULL) return;
+
+        AstTyped *default_value = NULL;
+        if (consume_token_if_next(parser, '=')) {
+            default_value = parse_expression(parser, 0);
+            if (parser->hit_unexpected_token || default_value == NULL) return;
+            name_package_parameter_function(parser, name, default_value);
+        }
+
+        PackageParam param = { 0 };
+        param.name = name;
+        param.name_atom = name_atom;
+        param.type_node = type_node;
+        param.expr = default_value;
+        param.has_default = default_value != NULL;
+        bh_arr_push(node->params, param);
+
+        if (parser->curr->type == ')') continue;
+        expect_token(parser, ',');
+    }
+
+    if (parser->hit_unexpected_token) return;
+
+    // The brace block is ordinary package code. It is checked immediately,
+    // so parameter types and defaults can name symbols defined in it.
+    skip_inserted_semicolons(parser);
+    if (parser->curr->type == '{') {
+        expect_token(parser, '{');
+        parse_top_level_statements_until(parser, '}');
+        expect_token(parser, '}');
+    }
+
+    if (duplicate || too_late || parser->hit_unexpected_token) return;
+
+    package->parameter_def = node;
+    remember_package_parameter_def(parser, node);
+    ENTITY_SUBMIT(node);
+
+    package->parameters_blocking = 1;
+    if (package->parameter_buffered_entities == NULL) {
+        bh_arr_new(parser->context->gp_alloc, package->parameter_buffered_entities, 16);
+    }
+}
+
+static void parse_package_parameter_provider(OnyxParser *parser, OnyxToken *token) {
+    char *package_name = parse_dotted_package_name(parser);
+    if (package_name == NULL || parser->hit_unexpected_token) return;
+
+    b32 targets_current = parser->package && parser->package->name && strcmp(package_name, parser->package->name) == 0;
+    if (targets_current) {
+        ONYX_ERROR(token->pos, Error_Critical, "Package '%s' cannot provide its own parameters.", package_name);
+    }
+
+    b32 duplicate = 0;
+    bh_arr_each(AstPackageParameters *, existing, parser->context->package_parameter_providers) {
+        if (*existing && (*existing)->package_name && strcmp((*existing)->package_name, package_name) == 0) {
+            duplicate = 1;
+            ONYX_ERROR(token->pos, Error_Critical, "Package parameters for '%s' were already specified.", package_name);
+            break;
+        }
+    }
+
+    AstPackageParameters *node = make_node(AstPackageParameters, Ast_Kind_Package_Parameters);
+    node->token = token;
+    node->is_provider = 1;
+    node->package_name = package_name;
+    bh_arr_new(parser->context->gp_alloc, node->params, 4);
+
+    expect_token(parser, '(');
+    skip_inserted_semicolons(parser);
+
+    while (!consume_token_if_next(parser, ')')) {
+        if (parser->hit_unexpected_token) return;
+        skip_inserted_semicolons(parser);
+        if (consume_token_if_next(parser, ')')) break;
+
+        OnyxToken *name = expect_token(parser, Token_Type_Symbol);
+        if (parser->hit_unexpected_token) return;
+
+        u32 name_atom = token_atom(parser->context, name);
+        if (package_param_name_taken(node->params, name_atom)) {
+            ONYX_ERROR(name->pos, Error_Critical, "Duplicate package parameter '%b'.", name->text, name->length);
+        }
+
+        expect_token(parser, '=');
+        AstTyped *value = parse_expression(parser, 0);
+        if (parser->hit_unexpected_token || value == NULL) return;
+        name_package_parameter_function(parser, name, value);
+
+        PackageParam param = { 0 };
+        param.name = name;
+        param.name_atom = name_atom;
+        param.expr = value;
+        bh_arr_push(node->params, param);
+
+        if (parser->curr->type == ')') continue;
+        expect_token(parser, ',');
+    }
+
+    if (targets_current || duplicate || parser->hit_unexpected_token) return;
+
+    remember_package_parameter_provider(parser, node);
+    ENTITY_SUBMIT(node);
+}
+
 static void parse_top_level_statement(OnyxParser* parser) {
     AstFlags private_kind = 0;
 
@@ -5040,6 +5269,14 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 }
 
                 ENTITY_SUBMIT(jsNode);
+                return;
+            }
+            else if (parse_possible_directive(parser, "package_parameters")) {
+                if (parser->curr->type == '(') {
+                    parse_package_parameter_definition(parser, dir_token);
+                } else {
+                    parse_package_parameter_provider(parser, dir_token);
+                }
                 return;
             }
             else if (parse_possible_directive(parser, "wasm_section")) {

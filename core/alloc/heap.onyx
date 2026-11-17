@@ -1,22 +1,25 @@
 package core.alloc.heap
 
+/// This is the implementation for the general purpose heap allocator.
+/// It is a simple bump allocator, with a free list. It is not very good
+/// but it suffices for the kinds of things being done in the early days
+/// of the language. You will not make your own instance of the heap
+/// allocator, since it controls WASM intrinsics such as memory_grow.
+
+#package_parameters(
+    // Enable this to enable checking for invalid blocks and other corruptions
+    // that may happen on the heap, with the added overhead of checking that
+    // on every alloc/resize/free.
+    Debug: bool = false
+
+    // Enable this to clear all memory to 'CC' after it is freed.
+    // Must be used in conjunction with the Debug flag
+    Clear_Freed_Memory: bool = false
+)
+
 use runtime
 use core
 
-
-// This is the implementation for the general purpose heap allocator.
-// It is a simple bump allocator, with a free list. It is not very good
-// but it suffices for the kinds of things being done in the early days
-// of the language. You will not make your own instance of the heap
-// allocator, since it controls WASM intrinsics such as memory_grow.
-
-
-
-// Enable this to enable checking for invalid blocks and other corruptions
-// that may happen on the heap, with the added overhead of checking that
-// on every alloc/resize/free.
-#local Enable_Debug :: #defined( runtime.vars.Enable_Heap_Debug )
-#local Enable_Clear_Freed_Memory :: #defined(runtime.vars.Enable_Heap_Clear_Freed_Memory)
 #local Enable_Stack_Trace :: runtime.Stack_Trace_Enabled
 
 #load "core:intrinsics/wasm"
@@ -85,18 +88,20 @@ get_freed_size :: () => {
         remaining_space : u32;
     }
 
+    HEAP_BLOCK_SIZE :: 4 * sizeof rawptr
+
     heap_block :: struct {
         size         : u32;
         magic_number : u32;
     }
 
-    heap_freed_block :: struct {
+    heap_freed_block :: struct #size HEAP_BLOCK_SIZE {
         use base: heap_block;
         next : &heap_freed_block;
         prev : &heap_freed_block;
     }
 
-    heap_allocated_block :: struct {
+    heap_allocated_block :: struct #size HEAP_BLOCK_SIZE  {
         use base: heap_block;
     }
 
@@ -111,7 +116,7 @@ get_freed_size :: () => {
 
         #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(&heap_mutex);
 
-        size := size_ + sizeof heap_block;
+        size := size_ + sizeof heap_allocated_block;
         size = math.max(size, sizeof heap_freed_block);
         memory.align(~~&size, ~~align);
 
@@ -137,7 +142,7 @@ get_freed_size :: () => {
         }
 
         if best != null {
-            #if Enable_Debug {
+            #if Debug {
                 assert(best.size & Allocated_Flag == 0, "Allocated block in free list.");
                 assert(best.magic_number == Free_Block_Magic_Number, "Malformed free block in free list.");
             }
@@ -197,7 +202,7 @@ get_freed_size :: () => {
     }
 
     heap_free :: (ptr: rawptr) {
-        #if Enable_Debug do assert(ptr != null, "Trying to free a null pointer.");
+        #if Debug do assert(ptr != null, "Trying to free a null pointer.");
 
         hb_ptr := cast(&heap_freed_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
 
@@ -211,7 +216,7 @@ get_freed_size :: () => {
 
         #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(&heap_mutex);
 
-        #if Enable_Debug {
+        #if Debug {
             // RELOCATE
             trace :: macro () {
                 #if Enable_Stack_Trace {
@@ -262,7 +267,7 @@ get_freed_size :: () => {
         hb_ptr.size &= ~Allocated_Flag;
         orig_size := hb_ptr.size - sizeof heap_allocated_block;
 
-        #if Enable_Debug && Enable_Clear_Freed_Memory {
+        #if Debug && Clear_Freed_Memory {
             memory_fill(ptr, ~~0xcc, orig_size);
         }
 
@@ -317,12 +322,12 @@ get_freed_size :: () => {
 
         #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(&heap_mutex);
 
-        new_size := new_size_ + sizeof heap_block;
+        new_size := new_size_ + sizeof heap_allocated_block;
         new_size = math.max(new_size, sizeof heap_freed_block);
         new_size = ~~memory.align(cast(u64) new_size, ~~align);
 
         hb_ptr := cast(&heap_allocated_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
-        #if Enable_Debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on resize.");
+        #if Debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on resize.");
         hb_ptr.size &= ~Allocated_Flag;
 
         old_size := hb_ptr.size;
@@ -359,7 +364,7 @@ get_freed_size :: () => {
         new_ptr := heap_alloc(new_size_, align);
         #if runtime.Multi_Threading_Enabled do sync.mutex_lock(&heap_mutex);
 
-        memory_copy(new_ptr, ptr, old_size - sizeof heap_block);
+        memory_copy(new_ptr, ptr, old_size - sizeof heap_allocated_block);
         heap_free(ptr);
         return new_ptr;
     }
@@ -374,4 +379,3 @@ get_freed_size :: () => {
         return null;
     }
 }
-

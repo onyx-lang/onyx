@@ -10,6 +10,14 @@ void package_track_use_package(Context *context, Package* package, Entity* entit
 void package_reinsert_use_packages(Context *context, Package* package);
 void package_mark_as_used(Context *context, Package* package);
 
+// Called on the first stuck compilation cycle. Returns 1 when defaults
+// were inserted and the caller should reset stall detection.
+b32 package_parameters_on_first_stall(Context *context);
+AstPackageParameters *find_package_parameter_provider(Context *context, char *name);
+PackageParam *find_package_param(AstPackageParameters *node, u32 name_atom);
+AstNode *package_parameter_bound_node(Context *context, Package *package, OnyxToken *name, AstTyped *value);
+void package_parameters_bind(Context *context, Package *package);
+
 void atom_table_init(Context *context);
 u32 atom_intern(Context *context, const char *name);
 const char *atom_name(Context *context, u32 atom);

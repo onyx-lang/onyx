@@ -1739,6 +1739,7 @@ static b32 compilation_log_kind_has_type_pointer(AstKind kind) {
         case Ast_Kind_Js_Code:
         case Ast_Kind_Compiler_Extension:
         case Ast_Kind_Procedural_Macro:
+        case Ast_Kind_Package_Parameters:
             return 0;
         default:
             return 1;

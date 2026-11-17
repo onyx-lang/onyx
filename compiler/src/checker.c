@@ -3776,6 +3776,7 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
         case Ast_Kind_Unary_Field_Access: break;
         case Ast_Kind_Foreign_Block: break;
         case Ast_Kind_Object_Block: break;
+        case Ast_Kind_Package_Parameters: break;
         case Ast_Kind_Zero_Value: break;
         case Ast_Kind_Interface: break;
         case Ast_Kind_Compiler_Extension: break;
@@ -7010,6 +7011,182 @@ static AstNode *entity_typed_node(Entity *ent) {
     }
 }
 
+static CheckStatus check_package_parameter_value(Context *context, AstTyped **pexpr, Type *expected, OnyxToken *name, b32 is_default) {
+    if (!pexpr || !*pexpr) return Check_Success;
+
+    if ((*pexpr)->entity) {
+        if ((*pexpr)->entity->state == Entity_State_Failed) return Check_Error;
+        if ((*pexpr)->entity->state < Entity_State_Code_Gen) {
+            YIELD_(name->pos, "Waiting for the %s of package parameter '%s' to be checked.",
+                is_default ? "default value" : "value", atom_name(context, token_atom(context, name)));
+        }
+    }
+
+    // Resolve symbols first. A type name such as f64 is a type node; checking
+    // it records that the expression's type is type_expr, which unify reads.
+    //
+    // Some values have no type until they are unified with the expected one.
+    // `.Option2` is a unary field access: checking it does nothing, and the
+    // enum member is chosen by the expected type.
+    CHECK(expression, pexpr);
+
+    TypeMatch match = unify_node_and_type(context, pexpr, expected);
+    if (match == TYPE_MATCH_YIELD || match == TYPE_MATCH_SPECIAL) {
+        YIELD_(name->pos, "Waiting for package parameter '%s' to be resolved.", atom_name(context, token_atom(context, name)));
+    }
+    if (match == TYPE_MATCH_FAILED) {
+        // `.Nope` already reported that the member does not exist.
+        if ((*pexpr)->kind == Ast_Kind_Unary_Field_Access && (*pexpr)->type == NULL) return Check_Error;
+
+        const char *got = (*pexpr)->type ? type_get_name(context, (*pexpr)->type) : "(unknown)";
+        if (is_default) {
+            ERROR_(name->pos, "Default value for package parameter '%s' has type '%s', but '%s' was expected.",
+                atom_name(context, token_atom(context, name)), got, type_get_name(context, expected));
+        }
+        ERROR_(name->pos, "Package parameter '%s' expects '%s', but was given '%s'.",
+            atom_name(context, token_atom(context, name)), type_get_name(context, expected), got);
+    }
+
+    if ((*pexpr)->type == NULL) resolve_expression_type(context, *pexpr);
+    if ((*pexpr)->type == NULL) {
+        YIELD_(name->pos, "Waiting for the type of package parameter '%s' to be known.", atom_name(context, token_atom(context, name)));
+    }
+
+    return Check_Success;
+}
+
+static CheckStatus resolve_package_parameter_definition(Context *context, AstPackageParameters *node) {
+    if (node->resolved) return Check_Success;
+
+    bh_arr_each(PackageParam, param, node->params) {
+        CHECK(type, &param->type_node);
+
+        Type *type = type_build_from_ast(context, param->type_node);
+        if (type == NULL) {
+            YIELD_(param->name->pos, "Waiting for the type of package parameter '%s' to be resolved.", atom_name(context, param->name_atom));
+        }
+        param->type = type;
+
+        CheckStatus value = check_package_parameter_value(context, &param->expr, type, param->name, 1);
+        if (value != Check_Success) return value;
+    }
+
+    node->resolved = 1;
+    return Check_Success;
+}
+
+static CheckStatus check_package_parameter_provider(Context *context, AstPackageParameters *node) {
+    Package *package = package_lookup(context, node->package_name);
+    if (!package) {
+        if (node->unresolved_is_error) {
+            ERROR_(node->token->pos, "Package '%s' was never loaded, but #package_parameters was given for it.", node->package_name);
+        }
+        YIELD_(node->token->pos, "Waiting for package '%s' to be loaded.", node->package_name);
+    }
+
+    AstPackageParameters *def = package->parameter_def;
+    if (!def) {
+        if (node->unresolved_is_error) {
+            ERROR_(node->token->pos, "Package '%s' has no #package_parameters definition.", node->package_name);
+        }
+        YIELD_(node->token->pos, "Waiting for the #package_parameters definition of package '%s'.", node->package_name);
+    }
+
+    if (def->defaults_inserted) {
+        ERROR_(node->token->pos, "Package parameters for '%s' were already filled with their defaults.", node->package_name);
+    }
+
+    if (def->entity && def->entity->state == Entity_State_Failed) return Check_Complete;
+    if (!def->resolved) {
+        YIELD_(node->token->pos, "Waiting for the #package_parameters definition of package '%s' to be checked.", node->package_name);
+    }
+    if (def->applied) return Check_Complete;
+
+    bh_arr_each(PackageParam, given, node->params) {
+        if (!find_package_param(def, given->name_atom)) {
+            ERROR_(given->name->pos, "Package '%s' has no parameter named '%s'.",
+                node->package_name, atom_name(context, given->name_atom));
+        }
+    }
+
+    bh_arr_each(PackageParam, param, def->params) {
+        if (find_package_param(node, param->name_atom)) continue;
+        if (param->has_default) continue;
+        ERROR_(node->token->pos, "Missing required package parameter '%s' for package '%s'.",
+            atom_name(context, param->name_atom), node->package_name);
+    }
+
+    bh_arr_each(PackageParam, given, node->params) {
+        PackageParam *param = find_package_param(def, given->name_atom);
+        if (!param || !given->expr) continue;
+
+        CheckStatus value = check_package_parameter_value(context, &given->expr, param->type, given->name, 0);
+        if (value != Check_Success) return value;
+    }
+
+    node->values_ready = 1;
+    package_parameters_bind(context, package);
+    return Check_Complete;
+}
+
+static CheckStatus check_package_parameter_definition(Context *context, AstPackageParameters *node) {
+    Package *package = context->checker.current_entity->package;
+    if (!package) {
+        ERROR(node->token->pos, "#package_parameters definition is not inside a package.");
+    }
+
+    CheckStatus resolved = resolve_package_parameter_definition(context, node);
+    if (resolved != Check_Success) return resolved;
+
+    AstPackageParameters *prov = find_package_parameter_provider(context, package->name);
+    if (prov && prov->entity && prov->entity->state == Entity_State_Failed) return Check_Complete;
+
+    if (node->unresolved_is_error && !node->applied) {
+        bh_arr_each(PackageParam, param, node->params) {
+            if (param->has_default) continue;
+            ERROR_(node->token->pos, "No #package_parameters were given for package '%s'. Parameter '%s' is required.",
+                package->name, atom_name(context, param->name_atom));
+        }
+        ERROR_(node->token->pos, "No #package_parameters were given for package '%s'.", package->name);
+    }
+
+    if (node->applied) return Check_Complete;
+
+    // Every parameter has a default and nobody has provided values. Bind those
+    // defaults now. Waiting for a stall deadlocks when this package's own
+    // symbols are required to finish loading the rest of the program, which
+    // is the case for core.alloc.heap. A provider parsed later is an error.
+    if (!prov) {
+        b32 all_optional = 1;
+        bh_arr_each(PackageParam, param, node->params) {
+            if (!param->has_default) all_optional = 0;
+        }
+        if (all_optional) {
+            node->defaults_inserted = 1;
+            package_parameters_bind(context, package);
+            return Check_Complete;
+        }
+    }
+
+    if (prov && prov->values_ready) {
+        package_parameters_bind(context, package);
+        return Check_Complete;
+    }
+
+    // A provider exists but its values are not ready. Once compilation has
+    // stalled, that provider reports the real problem (an unknown enum
+    // member, a type mismatch, a package that never loaded). This definition
+    // staying queued would only repeat "waiting for #package_parameters".
+    if (prov && context->cycle_detected) return Check_Complete;
+
+    YIELD_(node->token->pos, "Waiting for #package_parameters for package '%s'.", package->name);
+}
+
+CHECK_FUNC(package_parameters, AstPackageParameters *node) {
+    if (node->is_provider) return check_package_parameter_provider(context, node);
+    return check_package_parameter_definition(context, node);
+}
+
 void check_entity(Context *context, Entity* ent) {
     CheckStatus cs = Check_Success;
 
@@ -7078,6 +7255,7 @@ void check_entity(Context *context, Entity* ent) {
         case Entity_Type_JS:            cs = check_js_node(context, ent->js); break;
         case Entity_Type_Foreign_Block: cs = check_foreign_block(context, ent->foreign_block); break;
         case Entity_Type_Object_Block:  cs = check_object_block(context, ent->object_block); break;
+        case Entity_Type_Package_Parameters: cs = check_package_parameters(context, ent->package_parameters); break;
         case Entity_Type_Import:        cs = check_import(context, ent->import); break;
 
         case Entity_Type_Compiler_Extension:   cs = check_compiler_extension(context, ent->compiler_extension); break;

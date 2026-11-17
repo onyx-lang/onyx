@@ -114,6 +114,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Procedural_Expansion: return sizeof(AstProceduralExpansion);
         case Ast_Kind_Code_Block: return sizeof(AstCodeBlock);
         case Ast_Kind_Object_Block: return sizeof(AstObjectBlock);
+        case Ast_Kind_Package_Parameters: return sizeof(AstPackageParameters);
 
         default: break;
     }

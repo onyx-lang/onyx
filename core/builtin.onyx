@@ -406,7 +406,6 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
     delete :: macro (x: &$T/Destroyable) {
         x_ := x;
         T.destroy(x_);
-        cfree(x_);
     }
 }
 

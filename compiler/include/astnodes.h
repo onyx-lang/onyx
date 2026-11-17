@@ -125,7 +125,9 @@
                                \
     NODE(CompilerExtension)    \
     NODE(ProceduralMacro)      \
-    NODE(ProceduralExpansion)
+    NODE(ProceduralExpansion)  \
+                               \
+    NODE(PackageParameters)
 
 #define NODE(name) typedef struct Ast ## name Ast ## name;
 AST_NODES
@@ -278,6 +280,8 @@ typedef enum AstKind {
     Ast_Kind_Procedural_Expansion,
 
     Ast_Kind_Object_Block,
+
+    Ast_Kind_Package_Parameters,
 
     Ast_Kind_Count
 } AstKind;
@@ -1817,6 +1821,35 @@ struct AstObjectBlock {
     bh_arr(struct ObjectNamespace) namespaces;
 };
 
+// One entry in a #package_parameters list. A definition fills type_node
+// and, when the parameter is optional, expr. A provider fills expr only.
+typedef struct PackageParam {
+    OnyxToken *name;
+    u32 name_atom;
+
+    AstType *type_node;
+    Type *type;
+
+    AstTyped *expr;
+    b32 has_default;
+} PackageParam;
+
+// Either the definition (`#package_parameters(...) { ... }`) or the
+// single provider (`#package_parameters pkg(...)`).
+struct AstPackageParameters {
+    AstNode_base;
+
+    char *package_name;
+    bh_arr(PackageParam) params;
+
+    b32 is_provider : 1;
+    b32 resolved : 1;
+    b32 values_ready : 1;
+    b32 applied : 1;
+    b32 defaults_inserted : 1;
+    b32 unresolved_is_error : 1;
+};
+
 struct AstJsNode {
     AstNode_base;
 
@@ -1921,6 +1954,7 @@ typedef enum EntityType {
     Entity_Type_Function,
     Entity_Type_JS,
     Entity_Type_Object_Block,
+    Entity_Type_Package_Parameters,
 
     Entity_Type_Count,
 } EntityType;
@@ -1974,6 +2008,7 @@ typedef struct Entity {
         AstCompilerExtension  *compiler_extension;
         AstProceduralExpansion *proc_expansion;
         AstObjectBlock        *object_block;
+        AstPackageParameters  *package_parameters;
     };
 } Entity;
 
@@ -2061,7 +2096,16 @@ struct Package {
     // These entities are flushed to the entity heap when the package has been explicit used
     // somewhere.
     bh_arr(Entity *) buffered_entities;
+
+    // Entities held until this package's parameters are bound.
+    // Separate from buffered_entities, which #allow_stale_code uses.
+    bh_arr(Entity *) parameter_buffered_entities;
+    AstPackageParameters *parameter_def;
+
     b32 is_included_somewhere : 1;
+    b32 parameters_blocking : 1;
+    b32 parameters_ready : 1;
+    b32 submitted_live_entity : 1;
 };
 
 typedef enum CompileAction CompileAction;
@@ -2512,6 +2556,9 @@ typedef struct CompilationLog {
 
 struct Context {
     Table(Package *)      packages;
+    bh_arr(AstPackageParameters *) package_parameter_defs;
+    bh_arr(AstPackageParameters *) package_parameter_providers;
+
     EntityHeap            entities;
 
     Scope *global_scope;

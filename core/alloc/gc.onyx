@@ -1,3 +1,4 @@
+package core.alloc.gc
 /// "Garbage collection" is not somthing Onyx has. Even things
 /// like reference counted pointers is not something Onyx can
 /// do, because of Onyx's simpler semantics. That being said,
@@ -11,8 +12,10 @@
 ///     core.alloc.gc.auto() {
 ///         // Every allocation here will automatically be freed
 ///     }
-package core.alloc.gc
 
+#package_parameters(
+    Debug: bool = false
+)
 
 use runtime
 use core {package, *}
@@ -41,8 +44,6 @@ GCState.init :: (hs: &GCState, backing := context.allocator) {
 
 /// Frees every tracked allocation. The GCState can be used again.
 GCState.clear :: (hs: &GCState) {
-    Debug_Printing :: #defined(runtime.vars.Enable_GC_Debug)
-
     count := 0;
     size := 0;
 
@@ -50,7 +51,7 @@ GCState.clear :: (hs: &GCState) {
         n := l.next;
 
         if l.magic_number == GC_Link_Magic_Number {
-            #if Debug_Printing {
+            #if Debug {
                 count += 1;
                 size += *cast(&u32) (cast([&] u8) l - 8);
             }
@@ -62,7 +63,7 @@ GCState.clear :: (hs: &GCState) {
         l = n;
     }
 
-    #if Debug_Printing {
+    #if Debug {
         logf(.Debug, "Garbage collected items: {}", count);
         logf(.Debug, "Garbage collected bytes: {}", size);
     }
@@ -87,7 +88,7 @@ builtin.delete :: GCState.delete
 auto :: #match {
     macro () {
         use core.alloc {package, gc}
-        
+
         gcs := gc.GCState.make();
         old_allocator := context.allocator;
         context.allocator = alloc.as_allocator(&gcs);
@@ -100,7 +101,7 @@ auto :: #match {
     macro (body: Code) -> i32 {
         auto :: auto
 
-        auto(); 
+        auto();
         #unquote body;
 
         return 0;

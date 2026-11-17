@@ -781,6 +781,13 @@ void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *) *target_arr, A
             break;
         }
 
+        case Ast_Kind_Package_Parameters: {
+            ent.type = Entity_Type_Package_Parameters;
+            ent.package_parameters = (AstPackageParameters *) node;
+            ENTITY_INSERT(ent);
+            break;
+        }
+
         case Ast_Kind_Import: {
             ent.type = Entity_Type_Import;
             ent.import = (AstImport *) node;
