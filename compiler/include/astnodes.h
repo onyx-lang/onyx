@@ -2054,6 +2054,10 @@ typedef struct EntityHeap {
 
 void entity_heap_init(bh_allocator a, EntityHeap* entities);
 void entity_heap_insert_existing(EntityHeap* entities, Entity* e);
+// Move every yielded pre-codegen entity back to attempt 0. Used after
+// package-parameter defaults flush a package, so work that was waiting
+// can run again before the new entities form a cycle.
+void entity_heap_restart_retries(EntityHeap* entities);
 Entity* entity_heap_insert(EntityHeap* entities, Entity e);
 Entity* entity_heap_top(EntityHeap* entities);
 void entity_heap_change_top(EntityHeap* entities, Entity* new_top);

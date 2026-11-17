@@ -14,6 +14,10 @@ void package_mark_as_used(Context *context, Package* package);
 // were inserted and the caller should reset stall detection.
 b32 package_parameters_on_first_stall(Context *context);
 AstPackageParameters *find_package_parameter_provider(Context *context, char *name);
+// Claim this provider now that its entity is being checked. A provider that
+// was parsed into a dead branch never reaches here. Returns 0 when a
+// different provider for the same package was already claimed.
+b32 package_parameters_claim_provider(Context *context, AstPackageParameters *node);
 PackageParam *find_package_param(AstPackageParameters *node, u32 name_atom);
 AstNode *package_parameter_bound_node(Context *context, Package *package, OnyxToken *name, AstTyped *value);
 void package_parameters_bind(Context *context, Package *package);

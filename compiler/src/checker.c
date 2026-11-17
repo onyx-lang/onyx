@@ -7076,6 +7076,10 @@ static CheckStatus resolve_package_parameter_definition(Context *context, AstPac
 }
 
 static CheckStatus check_package_parameter_provider(Context *context, AstPackageParameters *node) {
+    if (!package_parameters_claim_provider(context, node)) {
+        ERROR_(node->token->pos, "Package parameters for '%s' were already specified.", node->package_name);
+    }
+
     Package *package = package_lookup(context, node->package_name);
     if (!package) {
         if (node->unresolved_is_error) {
@@ -7151,22 +7155,6 @@ static CheckStatus check_package_parameter_definition(Context *context, AstPacka
     }
 
     if (node->applied) return Check_Complete;
-
-    // Every parameter has a default and nobody has provided values. Bind those
-    // defaults now. Waiting for a stall deadlocks when this package's own
-    // symbols are required to finish loading the rest of the program, which
-    // is the case for core.alloc.heap. A provider parsed later is an error.
-    if (!prov) {
-        b32 all_optional = 1;
-        bh_arr_each(PackageParam, param, node->params) {
-            if (!param->has_default) all_optional = 0;
-        }
-        if (all_optional) {
-            node->defaults_inserted = 1;
-            package_parameters_bind(context, package);
-            return Check_Complete;
-        }
-    }
 
     if (prov && prov->values_ready) {
         package_parameters_bind(context, package);

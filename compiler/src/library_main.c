@@ -734,9 +734,18 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
                 }
 
                 // First stuck cycle, before all-types-checked and stalled hooks.
-                // Optional package parameters take their defaults here. A provider
-                // parsed after that is an error.
+                // Optional package parameters take their defaults here, once
+                // every provider that will actually be checked has had a
+                // chance to claim its package. A provider checked after that
+                // is an error.
+                //
+                // Binding flushes the package at attempt 0. Work that already
+                // yielded is in a later retry wave and would not run until
+                // that new work finished, so a static if still waiting to
+                // load a file can lose the race. Put those yields back on
+                // the first-try queue.
                 if (context->cycle_almost_detected == 0 && package_parameters_on_first_stall(context)) {
+                    entity_heap_restart_retries(&context->entities);
                     context->watermarked_node = NULL;
                     context->highest_watermark = 0;
                     context->cycle_almost_detected = 0;

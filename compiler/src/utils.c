@@ -2314,6 +2314,19 @@ AstPackageParameters *find_package_parameter_provider(Context *context, char *na
     return NULL;
 }
 
+b32 package_parameters_claim_provider(Context *context, AstPackageParameters *node) {
+    if (!node) return 0;
+
+    AstPackageParameters *existing = find_package_parameter_provider(context, node->package_name);
+    if (existing == node) return 1;
+    if (existing) return 0;
+
+    if (context->package_parameter_providers == NULL)
+        bh_arr_new(context->gp_alloc, context->package_parameter_providers, 4);
+    bh_arr_push(context->package_parameter_providers, node);
+    return 1;
+}
+
 PackageParam *find_package_param(AstPackageParameters *node, u32 name_atom) {
     bh_arr_each(PackageParam, param, node->params) {
         if (param->name_atom == name_atom) return param;

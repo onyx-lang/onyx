@@ -424,6 +424,50 @@ Entity* entity_heap_register(EntityHeap* entities, Entity e) {
     return entity;
 }
 
+void entity_heap_restart_retries(EntityHeap* entities) {
+    bh_arr(Entity *) pending = NULL;
+    bh_arr_new(entities->allocator, pending, 16);
+
+    i32 waves = bh_arr_length(entities->retry_waves);
+    for (i32 a = 0; a < waves; a++) {
+        bh_arr(Entity *) w = entities->retry_waves[a];
+        if (!w) continue;
+
+        // The active wave still holds entities that retry_pop already
+        // handed out. They sit below retry_index and are not queued.
+        i32 start = 0;
+        if (entities->retry_active_attempt != 0 && (u32) a == entities->retry_active_attempt)
+            start = entities->retry_index;
+
+        for (i32 i = start; i < bh_arr_length(w); i++) {
+            Entity *e = w[i];
+            if (!e || !e->entered_in_queue) continue;
+
+            entities->state_count[e->state]--;
+            entities->type_count[e->type]--;
+            entities->all_count[e->state][e->type]--;
+            e->entered_in_queue = 0;
+            bh_arr_push(pending, e);
+        }
+        bh_arr_set_length(w, 0);
+    }
+
+    entities->retry_count = 0;
+    entities->retry_min_attempt = 0xffffffffu;
+    entities->retry_active_attempt = 0;
+    entities->retry_index = 0;
+
+    bh_arr_each(Entity *, slot, pending) {
+        Entity *e = *slot;
+        if (e->state < Entity_State_Code_Gen) {
+            e->macro_attempts = 0;
+            e->micro_attempts = 0;
+        }
+        entity_heap_insert_existing(entities, e);
+    }
+    bh_arr_free(pending);
+}
+
 void entity_heap_insert_existing(EntityHeap* entities, Entity* e) {
     if (e->entered_in_queue) return;
 

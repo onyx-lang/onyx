@@ -4729,12 +4729,6 @@ static void remember_package_parameter_def(OnyxParser *parser, AstPackageParamet
     bh_arr_push(parser->context->package_parameter_defs, node);
 }
 
-static void remember_package_parameter_provider(OnyxParser *parser, AstPackageParameters *node) {
-    if (parser->context->package_parameter_providers == NULL)
-        bh_arr_new(parser->context->gp_alloc, parser->context->package_parameter_providers, 4);
-    bh_arr_push(parser->context->package_parameter_providers, node);
-}
-
 static b32 package_param_name_taken(bh_arr(PackageParam) params, u32 name_atom) {
     bh_arr_each(PackageParam, param, params) {
         if (param->name_atom == name_atom) return 1;
@@ -4884,15 +4878,9 @@ static void parse_package_parameter_provider(OnyxParser *parser, OnyxToken *toke
         ONYX_ERROR(token->pos, Error_Critical, "Package '%s' cannot provide its own parameters.", package_name);
     }
 
-    b32 duplicate = 0;
-    bh_arr_each(AstPackageParameters *, existing, parser->context->package_parameter_providers) {
-        if (*existing && (*existing)->package_name && strcmp((*existing)->package_name, package_name) == 0) {
-            duplicate = 1;
-            ONYX_ERROR(token->pos, Error_Critical, "Package parameters for '%s' were already specified.", package_name);
-            break;
-        }
-    }
-
+    // The provider is only an entity here. Static if keeps both branches, and
+    // only the branch that is checked claims the package. Registering now
+    // would treat a dead #if arm as the real provider.
     AstPackageParameters *node = make_node(AstPackageParameters, Ast_Kind_Package_Parameters);
     node->token = token;
     node->is_provider = 1;
@@ -4930,9 +4918,8 @@ static void parse_package_parameter_provider(OnyxParser *parser, OnyxToken *toke
         expect_token(parser, ',');
     }
 
-    if (targets_current || duplicate || parser->hit_unexpected_token) return;
+    if (targets_current || parser->hit_unexpected_token) return;
 
-    remember_package_parameter_provider(parser, node);
     ENTITY_SUBMIT(node);
 }
 
