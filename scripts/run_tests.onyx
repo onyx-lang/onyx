@@ -186,7 +186,8 @@ main :: (args) => {
             args << "run"
             args << "--generate-method-info"
             if check_leaks {
-                args << "-DLEAKCHECK"
+                args << "--param"
+                args << "runtime.platform.Leak_Check=true"
             }
             if thread_data.jit {
                 args << "--jit"

@@ -1,5 +1,10 @@
 package runtime.platform
 
+#package_parameters(
+    Memory_Watch: bool = false
+    Leak_Check: bool = false
+)
+
 use core {package, *}
 use runtime {
     package,
@@ -152,12 +157,12 @@ __start :: () {
     __runtime_initialize();
     context.thread_id = 0;
 
-    #if #defined(runtime.vars.MEMWATCH) {
+    #if Memory_Watch {
         use core.alloc.memwatch
         memwatch.enable_in_scope(context.allocator);
     }
 
-    #if #defined(runtime.vars.LEAKCHECK) {
+    #if Leak_Check {
         use core.alloc.gc
         gcs := gc.GCState.make();
         old_allocator := context.allocator;
