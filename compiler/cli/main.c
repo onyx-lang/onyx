@@ -149,7 +149,6 @@ typedef struct CLIArgs {
     char** passthrough_argument_data;
 
     const char* target_file;
-    const char* symbol_info_file;
     const char* help_subcommand;
     const char* injected_code_file;
     const char* events_file;

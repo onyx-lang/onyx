@@ -32,6 +32,4 @@ struct SymbolResolution {
 	u32 symbol_id;
 };
 
-void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer);
-
 #endif

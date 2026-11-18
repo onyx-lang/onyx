@@ -2280,7 +2280,6 @@ struct CompileOptions {
     Runtime runtime;
 
     bh_arr(bh_mapped_folder) mapped_folders;
-    const char* symbol_info_file;
 
     b32 debug_session;
     b32 debug_info_enabled;
