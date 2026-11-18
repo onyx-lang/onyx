@@ -786,6 +786,39 @@ TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b
     Type* node_type = get_expression_type(context, node);
     if (types_are_compatible(context, node_type, type)) return TYPE_MATCH_SUCCESS;
 
+    // A struct `Y` by pointer with a `use x: X` can be used anywhere a `&X` is
+    // expected. If the `x` member is not at offset 0, insert an address of a
+    // field access to effective tell the IR to move the pointer `offset` bytes
+    // forward. If AddressOf had an "offset" field, this could be done directly
+    // like a "load effective address" calculation, but this is good enough.
+    if (type_is_pointer(node_type) && type_is_pointer(type)) {
+        if (node_type->Pointer.elem->kind == Type_Kind_Struct && type->Pointer.elem->kind == Type_Kind_Struct) {
+            Type* node_type_struct = node_type->Pointer.elem;
+            Type* dest_type_struct = type->Pointer.elem;
+
+            bh_arr(StructMember *) members = node_type_struct->Struct.memarr;
+            bh_arr_each(StructMember *, pmem, members) {
+                StructMember *member = *pmem;
+                if (member->used && types_are_compatible(context, dest_type_struct, member->type)) {
+                    if (!permanent || member->offset == 0) {
+                        return TYPE_MATCH_SUCCESS;
+                    }
+
+                    AstFieldAccess *fa = make_field_access(context, node, NULL);
+                    fa->offset = member->offset;
+                    fa->idx = member->idx;
+                    fa->type = member->type;
+
+                    AstAddressOf *ao = make_address_of(context, (AstTyped *) fa);
+                    ao->type = type;
+
+                    *pnode = (AstTyped *) ao;
+                    return TYPE_MATCH_SUCCESS;
+                }
+            }
+        }
+    }
+
     // Method calls insert a removable address-of around the receiver. Peel it
     // before optional wrapping, which would otherwise strip it while matching
     // the inner type and then reject a receiver that already has the optional type.

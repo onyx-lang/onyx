@@ -4966,6 +4966,10 @@ CHECK_FUNC(struct, AstStructType* s_node) {
 
         if ((*smem)->used && !(*smem)->use_processed) {
             if (!type_struct_member_apply_use(context, s_node->pending_type, *smem)) {
+                if (onyx_has_errors(context)) {
+                    return Check_Error;
+                }
+
                 YIELD((*smem)->token->pos, "Waiting for use to be applied.");
             }
 

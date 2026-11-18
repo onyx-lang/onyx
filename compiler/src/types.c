@@ -116,13 +116,14 @@ b32 types_are_compatible(Context *context, Type* t1, Type* t2) {
             if (t2->kind == Type_Kind_Pointer) {
                 if (types_are_compatible(context, t1->Pointer.elem, t2->Pointer.elem)) return 1;
 
+                // Allow `use foo: Foo` in the first member slot to pass as a pointer to `Foo`.
                 if (t1->Pointer.elem->kind == Type_Kind_Struct && t2->Pointer.elem->kind == Type_Kind_Struct) {
                     Type* t1_struct = t1->Pointer.elem;
                     Type* t2_struct = t2->Pointer.elem;
 
                     bh_arr(StructMember *) members = t1_struct->Struct.memarr;
                     if (bh_arr_length(members) > 0 && members[0]->used)
-                        return types_are_compatible(context, t2_struct,members[0]->type);
+                        return types_are_compatible(context, t2_struct, members[0]->type);
                 }
             }
 
