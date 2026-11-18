@@ -892,8 +892,6 @@ int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t valu
     case ONYX_OPTION_GENERATE_DEBUG_INFO:    ctx->context.options.debug_info_enabled = value; return 1;
     case ONYX_OPTION_GENERATE_STACK_TRACE:   ctx->context.options.stack_trace_enabled = value; return 1;
     case ONYX_OPTION_GENERATE_NAME_SECTION:  ctx->context.options.generate_name_section = value; return 1;
-    case ONYX_OPTION_GENERATE_SYMBOL_INFO:   ctx->context.options.generate_symbol_info_file = value; return 1;
-    case ONYX_OPTION_GENERATE_LSP_INFO:      ctx->context.options.generate_lsp_info_file = value; return 1;
     case ONYX_OPTION_GENERATE_DOC_INFO:      ctx->context.options.generate_odoc = value; return 1;
     case ONYX_OPTION_DISABLE_CORE:           ctx->context.options.no_core = value; return 1;
     case ONYX_OPTION_DISABLE_STALE_CODE:     ctx->context.options.no_stale_code = value; return 1;
@@ -1137,13 +1135,6 @@ static void ensure_odoc_has_been_generated(onyx_context_t *ctx) {
     }
 }
 
-static void ensure_osym_has_been_generated(onyx_context_t *ctx) {
-    if (ctx->context.generated_osym_buffer.data == NULL) {
-        if (onyx_has_errors(&ctx->context)) return;
-        onyx_docs_emit_symbol_info(&ctx->context, &ctx->context.generated_osym_buffer);
-    }
-}
-
 static void ensure_injected_code_has_been_generated(onyx_context_t *ctx) {
     if (ctx->context.generated_injected_code_buffer.data == NULL) {
         bh_buffer *buff = &ctx->context.generated_injected_code_buffer;
@@ -1183,10 +1174,6 @@ int32_t onyx_output_length(onyx_context_t *ctx, onyx_output_type_t type) {
         ensure_odoc_has_been_generated(ctx);
         return ctx->context.generated_odoc_buffer.length;
 
-    case ONYX_OUTPUT_TYPE_OSYM:
-        ensure_osym_has_been_generated(ctx);
-        return ctx->context.generated_osym_buffer.length;
-
     case ONYX_OUTPUT_TYPE_INJECTED_CODE:
         ensure_injected_code_has_been_generated(ctx);
         return ctx->context.generated_injected_code_buffer.length;
@@ -1212,11 +1199,6 @@ void onyx_output_write(onyx_context_t *ctx, onyx_output_type_t type, void *buffe
     case ONYX_OUTPUT_TYPE_ODOC:
         ensure_odoc_has_been_generated(ctx);
         memcpy(buffer, ctx->context.generated_odoc_buffer.data, ctx->context.generated_odoc_buffer.length);
-        break;
-
-    case ONYX_OUTPUT_TYPE_OSYM:
-        ensure_osym_has_been_generated(ctx);
-        memcpy(buffer, ctx->context.generated_osym_buffer.data, ctx->context.generated_osym_buffer.length);
         break;
 
     case ONYX_OUTPUT_TYPE_INJECTED_CODE:

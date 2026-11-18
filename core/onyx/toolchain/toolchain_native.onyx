@@ -21,8 +21,8 @@ onyx_option_t :: enum {
     GENERATE_DEBUG_INFO :: 7
     GENERATE_STACK_TRACE :: 8
     GENERATE_NAME_SECTION :: 9
-    GENERATE_SYMBOL_INFO :: 10
-    GENERATE_LSP_INFO :: 11
+    // GENERATE_SYMBOL_INFO :: 10
+    // GENERATE_LSP_INFO :: 11
     GENERATE_DOC_INFO :: 12
     DISABLE_CORE :: 13
     DISABLE_STALE_CODE :: 14
@@ -58,7 +58,7 @@ onyx_output_type_t :: enum {
     WASM :: 0
     JS :: 1
     ODOC :: 2
-    OSYM :: 3
+    // OSYM :: 3
     INJECTED_CODE :: 4
 }
 
