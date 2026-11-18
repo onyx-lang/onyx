@@ -54,11 +54,7 @@ Slice.free :: (sl: &[] $T, allocator := context.allocator) {
 // Allows for make([] i32).
 #overload
 __make_overload :: macro (_: &[] $T, count: u32, allocator := context.allocator) -> [] T {
-    use core.memory
-
-    ret := Slice.make(T, count, allocator);
-    memory.set(ret.data, 0, sizeof T * count);
-    return ret;
+    return Slice.make(T, count, allocator);
 }
 
 //

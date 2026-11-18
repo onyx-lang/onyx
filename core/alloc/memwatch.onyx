@@ -4,8 +4,9 @@
 /// about the memory usage in the program.
 ///
 /// This is best used when it starts at the very beginning of the program.
-/// The easiest way to use this is to define MEMWATCH in runtime.vars,
-/// or pass -DMEMWATCH on the command line. 
+/// The easiest way to use this is to pass Memory_Watch = true to the 
+/// runtime.platform package parameters, or pass --param runtime.platform.Memory_Watch=true
+/// on the command line.
 package core.alloc.memwatch
 #allow_stale_code
 
@@ -13,7 +14,6 @@ use core {Result}
 use core.alloc
 use core.net
 use core.io
-use core.slice
 use core.encoding.osad
 use runtime
 
