@@ -427,6 +427,10 @@ static b32 process_entity(Context *context, Entity* ent) {
                 initalize_special_globals(context);
             }
 
+            // Clear this flag so multiple of these hooks can happen
+            // if new code keeps being injected.
+            context->all_code_checked_hook_done = 0;
+
             if (process_load_entity(context, ent)) {
                 // GROSS
                 if (   ent == context->special_global_entities.runtime_info_types_entity
@@ -486,6 +490,8 @@ static void dump_cycles(Context *context) {
 
 // TODO: relocate this function
 static void send_stalled_hooks(Context *context) {
+    compiler_event_add(context, ONYX_EVENT_STALLED);
+
     // Compilation-event delivery is batched. A stall is the last chance
     // for an extension to see every type/symbol recorded so far and
     // inject code that resolves the missing names.
@@ -494,15 +500,6 @@ static void send_stalled_hooks(Context *context) {
     bh_arr_each(CompilerExtension, ext, context->extensions) {
         compiler_extension_hook_stalled(context, ext->id);
     }
-}
-
-static b32 heap_has_pre_codegen_work(Context *context) {
-    i32 *sc = context->entities.state_count;
-    return sc[Entity_State_Parse_Builtin]
-         + sc[Entity_State_Introduce_Symbols]
-         + sc[Entity_State_Parse]
-         + sc[Entity_State_Resolve_Symbols]
-         + sc[Entity_State_Check_Types] > 0;
 }
 
 static void send_all_code_checked_hooks(Context *context) {
@@ -514,29 +511,14 @@ static void send_all_code_checked_hooks(Context *context) {
 // Barrier before code generation. Compilation-event delivery stays async;
 // this is the rendezvous where extensions can inject more source
 // (`#init`, tagged procedures, …) after everything has type-checked.
-// Returns 1 if inject added compile work that must run first.
 static b32 maybe_all_code_checked_barrier(Context *context) {
     if (context->all_code_checked_hook_done) return 0;
-    if (heap_has_pre_codegen_work(context)) return 0;
-
-    b32 any = 0;
-    bh_arr_each(CompilerExtension, ext, context->extensions) {
-        if (ext->alive && ext->supports_all_code_checked_hook) {
-            any = 1;
-            break;
-        }
-    }
-    if (!any) {
-        context->all_code_checked_hook_done = 1;
-        return 0;
-    }
+    context->all_code_checked_hook_done = 1;
 
     send_all_code_checked_hooks(context);
+    compiler_event_add(context, ONYX_EVENT_ALL_CODE_CHECKED);
 
-    if (heap_has_pre_codegen_work(context)) return 1;
-
-    context->all_code_checked_hook_done = 1;
-    return 0;
+    return 1;
 }
 
 static void prime_pump(Context *context) {

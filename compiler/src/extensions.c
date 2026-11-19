@@ -259,14 +259,14 @@ static i32 extension_recv_int(CompilerExtension *ext) {
 // static char *extension_recv_bytes(CompilerExtension *ext, i32 len) {
 //     bh_allocator a = bh_arena_allocator(&ext->arena);
 //     char *buf = bh_alloc(a, len);
-// 
+//
 //     i32 bytes_read = 0;
 //     while (bytes_read < len) {
 //         if (!ext->alive) break;
-// 
+//
 //         bytes_read += extension_recv(ext, buf + bytes_read, len);
 //     }
-// 
+//
 //     return buf;
 // }
 
@@ -278,7 +278,7 @@ static char *extension_recv_str(CompilerExtension *ext, i32 *out_len) {
     char *buf = bh_alloc(a, len + 1);
     if (!buf) return NULL;
 
-    i32 bytes_read = 0; 
+    i32 bytes_read = 0;
     while (bytes_read < len) {
         if (!ext->alive) break;
 
@@ -452,7 +452,7 @@ b32 compiler_extension_negotiate_capabilities(Context *context, CompilerExtensio
         "Extension '%s' spawned with protocol version %d.",
         ext->name, extension_protocol_version
     );
-    
+
     bh_arena_clear(&ext->arena);
     return 1;
 }
@@ -495,6 +495,7 @@ static AstNode * parse_code(Context *context, ProceduralMacroExpansionKind kind,
     context->highest_watermark = 0;
     context->cycle_almost_detected = 0;
     context->cycle_detected = 0;
+    context->all_code_checked_hook_done = 0;
 
     return result;
 }
@@ -522,7 +523,7 @@ static b32 handle_common_messages(Context *context, CompilerExtension *ext, int 
 
             i32 line_diff = line - tkn->pos.line;
             if (line_diff == 0) {
-                pos.line_start = tkn->pos.line_start; 
+                pos.line_start = tkn->pos.line_start;
             } else {
                 char *c = tkn->text;
                 while (*c && line_diff > 0) {
@@ -746,4 +747,3 @@ void compiler_extension_terminate(Context *context, int extension_id) {
     ext->recv_file = 0;
     ext->alive = 0;
 }
-

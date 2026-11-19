@@ -74,6 +74,8 @@ onyx_event_type_t :: enum {
     PHASE_START :: 2
     SYMBOL_DEFINED :: 3
     ALL_TYPES_CHECKED :: 4
+    STALLED :: 5
+    ALL_CODE_CHECKED :: 6
 }
 
 onyx_context_t :: #distinct u64

@@ -422,17 +422,16 @@ CompilationInfo.lookup :: (self: &#Self, scope_id: u32, name: str) -> ? &SymbolI
     hops := 0
     while id != 0 && hops < 256 {
         hops += 1
-        switch self->get_scope(id) {
-            case .Some as sc {
-                for sid in sc.symbol_ids {
-                    if self->get_symbol(sid) as sym {
-                        if sym.name == name do return sym
-                    }
+        if self->get_scope(id) as sc {
+            for sid in sc.symbol_ids {
+                if self->get_symbol(sid) as sym {
+                    if sym.name == name do return sym
                 }
-                if sc.parent_scope_id == id do return .None
-                id = sc.parent_scope_id
             }
-            case .None do return .None
+            if sc.parent_scope_id == id do return .None
+            id = sc.parent_scope_id
+        } else {
+            return .None
         }
     }
     return .None
@@ -440,15 +439,12 @@ CompilationInfo.lookup :: (self: &#Self, scope_id: u32, name: str) -> ? &SymbolI
 
 /// Name in this scope only; does not walk parents.
 CompilationInfo.lookup_in_scope :: (self: &#Self, scope_id: u32, name: str) -> ? &SymbolInfo {
-    switch self->get_scope(scope_id) {
-        case .Some as sc {
-            for sid in sc.symbol_ids {
-                if self->get_symbol(sid) as sym {
-                    if sym.name == name do return sym
-                }
+    if self->get_scope(scope_id) as sc {
+        for sid in sc.symbol_ids {
+            if self->get_symbol(sid) as sym {
+                if sym.name == name do return sym
             }
         }
-        case .None {}
     }
     return .None
 }
@@ -686,9 +682,7 @@ CompilationInfo.type_of :: (self: &#Self, symbol_id: u32) -> ? &TypeInfo {
             if self->get_type(sym.type_id) as t do return t
 
             // `use pkg { * }` copies a name into the using scope. The
-            // declaring symbol still has the type binding. Parameters
-            // share short names (`r`, `x`, `value`) across the program;
-            // do not steal another parameter's type.
+            // declaring symbol still has the type binding.
             if sym.kind == .Parameter do return .None
 
             for id in self->symbols_named(sym.name) {
@@ -707,13 +701,10 @@ CompilationInfo.type_of :: (self: &#Self, symbol_id: u32) -> ? &TypeInfo {
 
 CompilationInfo.member :: (self: &#Self, type_id: u32, name: str) -> ? &TypeStructMember {
     if self->get_type(type_id) as t {
-        switch t.details {
-            case .Struct as &sb {
-                for& m in sb.members {
-                    if m.name == name do return m
-                }
+        if t.details.Struct as &sb {
+            for& m in sb.members {
+                if m.name == name do return m
             }
-            case _ {}
         }
     }
     return .None
@@ -728,13 +719,10 @@ CompilationInfo.lookup_member :: (self: &#Self, type_id: u32, name: str) -> ? &S
 
 CompilationInfo.variant :: (self: &#Self, type_id: u32, name: str) -> ? &TypeUnionVariant {
     if self->get_type(type_id) as t {
-        switch t.details {
-            case .Union as &ub {
-                for& v in ub.variants {
-                    if v.name == name do return v
-                }
+        if t.details.Union as &ub {
+            for& v in ub.variants {
+                if v.name == name do return v
             }
-            case _ {}
         }
     }
     return .None
@@ -742,44 +730,37 @@ CompilationInfo.variant :: (self: &#Self, type_id: u32, name: str) -> ? &TypeUni
 
 /// Template this instance was built from (`Map` for `Map(str, u32)`).
 CompilationInfo.constructed_from :: (self: &#Self, type_id: u32) -> ? &TypeInfo {
-    switch self->get_type(type_id) {
-        case .Some as t {
-            if t.constructed_from_id == 0 do return .None
-            return self->get_type(t.constructed_from_id)
-        }
-        case .None do return .None
+    if self->get_type(type_id) as t {
+        if t.constructed_from_id == 0 do return .None
+        return self->get_type(t.constructed_from_id)
     }
+    return .None
 }
 
 /// Solved poly argument of this instance (`"Value_Type"` → `u32` on `Map(str, u32)`).
 CompilationInfo.poly_arg :: (self: &#Self, type_id: u32, name: str) -> ? &TypeInfo {
-    switch self->get_type(type_id) {
-        case .Some as t {
-            for n, i in t.poly_arg_names {
-                if n != name do continue
-                if i >= t.poly_arg_type_ids.count do return .None
-                return self->get_type(t.poly_arg_type_ids[i])
-            }
-            return .None
+    if self->get_type(type_id) as t {
+        for n, i in t.poly_arg_names {
+            if n != name do continue
+            if i >= t.poly_arg_type_ids.count do return .None
+            return self->get_type(t.poly_arg_type_ids[i])
         }
-        case .None do return .None
     }
+    return .None
 }
 
 /// Element type of a pointer, multi-pointer, slice, dyn-array, varargs, or array;
 /// base type of a distinct type.
 CompilationInfo.elem :: (self: &#Self, type_id: u32) -> ? &TypeInfo {
-    switch self->get_type(type_id) {
-        case .Some as t {
-            switch t.body {
-                case .Elem as e do return self->get_type(e.elem_id)
-                case .Array as a do return self->get_type(a.elem_id)
-                case .Distinct as d do return self->get_type(d.base_id)
-                case _ do return .None
-            }
+    if self->get_type(type_id) as t {
+        switch t.body {
+            case .Elem as e do return self->get_type(e.elem_id)
+            case .Array as a do return self->get_type(a.elem_id)
+            case .Distinct as d do return self->get_type(d.base_id)
+            case _ do return .None
         }
-        case .None do return .None
     }
+    return .None
 }
 
 /// Symbol referenced at this source position. If several spans overlap,

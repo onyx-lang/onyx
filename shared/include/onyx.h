@@ -97,6 +97,8 @@ typedef enum onyx_event_type_t {
     ONYX_EVENT_PHASE_START       = 2,
     ONYX_EVENT_SYMBOL_DEFINED    = 3,
     ONYX_EVENT_ALL_TYPES_CHECKED = 4,
+    ONYX_EVENT_STALLED           = 5,
+    ONYX_EVENT_ALL_CODE_CHECKED  = 6,
 } onyx_event_type_t;
 
 

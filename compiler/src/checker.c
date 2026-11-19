@@ -3966,7 +3966,7 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
 CHECK_FUNC(directive_defined, AstDirectiveDefined** pdefined) {
     AstDirectiveDefined* defined = *pdefined;
 
-    b32 has_to_be_resolved = context->cycle_almost_detected >= 1;
+    b32 has_to_be_resolved = context->cycle_almost_detected > 0;
 
     // We disable errors here so if we fail a symbol resolution, we don't generate any errors
     // and instead can capture that as "not defined".

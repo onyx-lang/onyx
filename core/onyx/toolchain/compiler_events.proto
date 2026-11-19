@@ -299,7 +299,6 @@ message EventTag {
 message TagValue {
   oneof data {
     TagNumber number = 1;
-    // Only `str`.
     string str = 2;
     TagRawValue raw_value = 3;
   }
@@ -317,6 +316,6 @@ message TagNumber {
 
 message TagRawValue {
   uint32 type_id = 1;
-  // OSAD bytes. Empty when the value cannot be encoded.
+  // OSAD encoded value as bytes bytes. Empty when the value cannot be encoded.
   bytes bytes = 2;
 }
