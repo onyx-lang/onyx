@@ -291,6 +291,30 @@ strerror :: (err: i32) -> rawptr {
     return ~~buf
 }
 
+/// C `strerror_r` (XSI). Copies the `strerror` text into `buf`.
+/// Returns 0, or an errno value when `buf` cannot hold the text.
+strerror_r :: (errnum: i32, buf: rawptr, buflen: i32) -> i32 {
+    if buf == null || buflen <= 0 {
+        errno = EINVAL
+        return EINVAL
+    }
+
+    src := cast([&] u8) strerror(errnum)
+    dst := cast([&] u8) buf
+    i := 0
+    limit := buflen - 1
+    while i < limit && src[i] != 0 {
+        dst[i] = src[i]
+        i += 1
+    }
+    dst[i] = 0
+    if src[i] != 0 {
+        errno = ERANGE
+        return ERANGE
+    }
+    return 0
+}
+
 /// C `getenv`. The returned string is a `malloc` copy; missing names return null.
 #if runtime.platform.Supports_Env_Vars {
     getenv :: (name: rawptr) -> rawptr {
@@ -1131,6 +1155,12 @@ __cxa_atexit :: (func: i32, arg: rawptr, dso: rawptr) -> i32 {
     return 0
 }
 
+/// C `atexit`. `func` is a wasm function-table index for `void (*)(void)`.
+/// Recorded beside `__cxa_atexit`. The list is not walked on exit yet.
+atexit :: (func: i32) -> i32 {
+    return __cxa_atexit(func, null, __dso_handle)
+}
+
 i128 :: struct {lo, hi: i64}
 
 __ashlti3 :: (ret: &i128, lo: i64, hi: i64, sh: i32) {
@@ -1252,6 +1282,57 @@ time :: (out: rawptr) -> i64 {
     sec := cast(i64) runtime.platform.__time() / 1000
     if out != null do *cast(&i64) out = sec
     return sec
+}
+
+/// wasm32-wasi `struct tm` (`__struct_tm.h`). The first nine fields match `time.Timestamp`.
+Tm :: struct {
+    sec: i32
+    min: i32
+    hour: i32
+    mday: i32
+    mon: i32
+    year: i32
+    wday: i32
+    yday: i32
+    isdst: i32
+    gmtoff: i32
+    zone: rawptr
+    nsec: i32
+}
+
+tm_slot: Tm
+
+#local
+fill_tm :: (timer: rawptr) -> rawptr {
+    if timer == null do return null
+
+    ts := core.time.gmtime(*cast(&i64) timer)
+    tm_slot = .{
+        sec    = ts.sec,
+        min    = ts.min,
+        hour   = ts.hour,
+        mday   = ts.mday,
+        mon    = ts.mon,
+        year   = ts.year,
+        wday   = ts.wday,
+        yday   = ts.yday,
+        isdst  = 0,
+        gmtoff = 0,
+        zone   = null,
+        nsec   = 0,
+    }
+    return &tm_slot
+}
+
+/// C `gmtime`. `timer` points at a wasm32 `time_t` (`long long`).
+/// The result is one reused `struct tm`.
+gmtime :: (timer: rawptr) -> rawptr {
+    return fill_tm(timer)
+}
+
+/// C `localtime`. There is no timezone database, so this matches `gmtime` and reuses its buffer.
+localtime :: (timer: rawptr) -> rawptr {
+    return fill_tm(timer)
 }
 
 #if runtime.platform.Supports_Files {
