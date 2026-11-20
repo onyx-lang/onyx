@@ -1,0 +1,12 @@
+use core {*}
+
+// `global` is an ordinary name.
+global := 41
+counter :: #wasm_global i32
+
+main :: () {
+    counter = global + 1
+    println(counter)
+    counter = counter + 5
+    println(counter)
+}

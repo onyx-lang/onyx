@@ -59,7 +59,7 @@ is_ident_char :: (c: u8) -> bool {
 }
 
 is_keyword :: (s: str) -> bool {
-    words := str.["package", "struct", "union", "enum", "use", "if", "else", "elseif", "return", "global", "cast", "while", "for", "break", "continue", "sizeof", "alignof", "typeof", "defer", "do", "case", "switch", "fallthrough", "macro", "interface", "where", "as", "in", "true", "false", "null", "void", "bool", "str", "rawptr", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64"];
+    words := str.["package", "struct", "union", "enum", "use", "if", "else", "elseif", "return", "cast", "while", "for", "break", "continue", "sizeof", "alignof", "typeof", "defer", "do", "case", "switch", "fallthrough", "macro", "interface", "where", "as", "in", "true", "false", "null", "void", "bool", "str", "rawptr", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64"];
     for w in words {
         if s == w do return true;
     }

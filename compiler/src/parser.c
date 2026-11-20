@@ -4106,10 +4106,12 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
 }
 
 static AstTyped* parse_global_declaration(OnyxParser* parser) {
-    expect_no_stored_tags(parser);
+    // :LinearTokenDependent
+    OnyxToken *directive_token = peek_token(-2);
+    expect_no_stored_tags_pos(parser, directive_token->pos);
 
     AstGlobal* global_node = make_node(AstGlobal, Ast_Kind_Global);
-    global_node->token = expect_token(parser, Token_Type_Keyword_Global);
+    global_node->token = directive_token;
 
     global_node->type_node = parse_type(parser);
 
@@ -4498,7 +4500,6 @@ static AstCompilerExtension* parse_compiler_extension(OnyxParser* parser, OnyxTo
 }
 
 static AstTyped* parse_top_level_expression(OnyxParser* parser) {
-    if (parser->curr->type == Token_Type_Keyword_Global)    return parse_global_declaration(parser);
     if (parser->curr->type == Token_Type_Keyword_Struct)    return (AstTyped *) parse_struct(parser);
     if (parser->curr->type == Token_Type_Keyword_Interface) return (AstTyped *) parse_interface(parser);
     if (parser->curr->type == Token_Type_Keyword_Enum)      return (AstTyped *) parse_enum_declaration(parser);
@@ -4506,6 +4507,10 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
     if (parser->curr->type == Token_Type_Keyword_Union)     return (AstTyped *) parse_union(parser);
 
     if (parser->curr->type == '#') {
+        if (parse_possible_directive(parser, "wasm_global")) {
+            return parse_global_declaration(parser);
+        }
+
         if (parse_possible_directive(parser, "type")) {
             AstTypeAlias* alias = make_node(AstTypeAlias, Ast_Kind_Type_Alias);
             alias->to = parse_type(parser);

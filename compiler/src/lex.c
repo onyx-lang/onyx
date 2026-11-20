@@ -25,7 +25,6 @@ static const char* token_type_names[] = {
     "else",
     "elseif",
     "return",
-    "global",
     "cast",
     "while",
     "for",
@@ -461,9 +460,6 @@ whitespace_skipped:
         LITERAL_TOKEN("for",         1, Token_Type_Keyword_For);
         LITERAL_TOKEN("false",       1, Token_Type_Literal_False);
         LITERAL_TOKEN("fallthrough", 1, Token_Type_Keyword_Fallthrough);
-        break;
-    case 'g':
-        LITERAL_TOKEN("global",      1, Token_Type_Keyword_Global);
         break;
     case 'i':
         LITERAL_TOKEN("if",          1, Token_Type_Keyword_If);
