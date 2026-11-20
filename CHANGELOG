@@ -1,4 +1,4 @@
-Release 0.1.14
+Release 2611
 --------------
 Not released yet
 
@@ -8,11 +8,23 @@ Changes:
     - The compiler being accessible from the language itself (`package core.onyx`)
     - `for`-macros
     - and much more in the future
+- Calling convention was changed to match existing C WASM ABIs
+    - Compound return values are returned by pointer in the first argument
+- `#file_contents` follows the same rules as `#load`; always relative to the current file
+- Widespread removal of old `package.function` functions in favor of `package.Type.method`
 
 Additions:
 - Compiler can be used as a C library using provided `include/onyx.h` and `lib/libonyx.so`
 - for-loops are implemented as a macro (`__for_expansion` in `builtin.onyx`)
-    - This allows you to write for-loops over custom data types
+    - This allows you to write for-loops over custom data types.
+- `#object "library.wasm"` links a WASM object file or archive produced by Clang/GCC
+- `if optional as value` syntax for easily extracting the value from a `Some` optional.
+    - `while optional as value` syntax for easily iterating over iterables.
+- Polymorphic return types, i.e. `() -> $R { ... }`. Resolves return type from callee.
+    - `From` interface and `From.from` uses this for explicit automatic conversions.
+- `#solidify` can now pick an overload by argument types
+    - `#solidify overloaded_function(i32)`
+- Macros now accept `any` and `..any` arguments
 - `#unquote` now has more control over unquoted code
     - `#scope(Code)` to set parent scope
     - `#inject` to add custom bindings visible in unquoted body
@@ -20,11 +32,20 @@ Additions:
     - `block.capture_count` for number of captures
     - `block.capture_type_N` where N is a 1-index psuedo-array of given types
         - `[a: i32] {}` would have `capture_type_1` equal to `i32`
+- WASI Preview 2 and WASM Component Model support
+    - `onyx wit-bindgen` for generating WIT bindings
 
 Removals:
 - `#load_all` is deprecated in favor of `#load`
+- Widespread removal of old `package.function` functions in favor of `package.Type.method`
 
 Bugfixes:
+- Compound assignment (`+=`, `-=`, etc) only evaluate the left hand side once.
+- Procedure types properly associate (`(i32) -> (i32) -> i32`)
+- `typeof Struct.{}.x` and `Struct.{}.x` work
+- `.[10, 20, 30][0]` works
+
+
 
 
 

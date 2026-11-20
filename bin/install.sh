@@ -208,16 +208,16 @@ initOS() {
 initRuntime() {
     printf "${green}Please choose a WebAssembly runtime to use with your Onyx installation.\n${reset}"
 
-    echo "1) Wasmer: An industry standard WebAssembly runtime. Very fast. (default)"
-    echo "2) OVM: A custom, lightweight runtime made for Onyx. Supports debugging. Slower than Wasmer."
+    echo "1) OVM: A custom, lightweight runtime made for Onyx. Supports debugging and native compilation. Slower than Wasmer. (default)"
+    echo "2) Wasmer: An industry standard WebAssembly runtime. Very fast."
     echo "3) None: Omit using a runtime and only use Onyx as a compiler to WebAssembly."
 
     read -p "Which runtime would you like to use? [1/2/3] " selected
 
     case $selected in
-        1) RUNTIME="wasmer"; break ;; 
-        2) RUNTIME="ovm"; break ;; 
-        3) RUNTIME="none"; break ;; 
+        1) RUNTIME="ovm"; break ;;
+        2) RUNTIME="wasmer"; break ;;
+        3) RUNTIME="none"; break ;;
         *) echo "Invalid choice. Defaulting to 'wasmer'."; RUNTIME="wasmer" ;;
     esac
 }
@@ -282,7 +282,7 @@ semverParseInto() {
 }
 
 ###
-# Code taken from 
+# Code taken from
 #    https://raw.githubusercontent.com/wasmerio/wasmer-install/master/install.sh
 ###
 semver_compare() {
