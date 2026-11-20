@@ -646,12 +646,18 @@ static void parse_arguments(OnyxParser* parser, TokenType end_token, Arguments* 
     }
 }
 
+static b32 token_is_placeholder(OnyxToken *token) {
+    return token
+        && token->type == Token_Type_Symbol
+        && token->length == 1
+        && token->text
+        && token->text[0] == '_';
+}
+
 static b32 value_is_placeholder(AstTyped *arg) {
-    if (arg == NULL || arg->token == NULL) return 0;
+    if (arg == NULL) return 0;
     if (arg->kind != Ast_Kind_Symbol) return 0;
-    if (arg->token->length > 1) return 0;
-    if (arg->token->text[0] != '_') return 0;
-    return 1;
+    return token_is_placeholder(arg->token);
 }
 
 static AstCall* parse_function_call(OnyxParser *parser, AstTyped *callee) {
@@ -802,7 +808,15 @@ static AstTyped* parse_factor_impl(OnyxParser* parser) {
             cast_node->token = expect_token(parser, Token_Type_Keyword_Cast);
 
             expect_token(parser, '(');
-            cast_node->type_node = parse_type(parser);
+
+            // cast(_) expr and cast(_, expr) are the auto-cast operator, ~~.
+            if (token_is_placeholder(parser->curr)
+                && (peek_token(1)->type == ')' || peek_token(1)->type == ',')) {
+                consume_token(parser);
+                cast_node->operation = Unary_Op_Auto_Cast;
+            } else {
+                cast_node->type_node = parse_type(parser);
+            }
 
             if (peek_token(0)->type == ',') {
                 expect_token(parser, ',');

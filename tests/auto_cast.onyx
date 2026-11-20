@@ -1,0 +1,17 @@
+use core {*}
+
+take :: (x: i64) {
+    println(x)
+}
+
+main :: () {
+    n: i32 = 7
+
+    take(~~ n)
+    take(cast(_) n)
+    take(cast(_, n + 1))
+
+    wide: i64 = cast(_) n
+    println(wide)
+    println(cast(i32) wide)
+}
