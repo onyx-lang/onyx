@@ -218,7 +218,7 @@ initRuntime() {
         1) RUNTIME="ovm"; break ;;
         2) RUNTIME="wasmer"; break ;;
         3) RUNTIME="none"; break ;;
-        *) echo "Invalid choice. Defaulting to 'wasmer'."; RUNTIME="wasmer" ;;
+        *) echo "Invalid choice. Defaulting to 'wasmer'."; RUNTIME="ovm" ;;
     esac
 }
 
