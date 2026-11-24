@@ -4,7 +4,7 @@
 #define VERSION_MAJOR 2611
 #define VERSION_MINOR 0
 #define VERSION_PATCH 0
-#define VERSION_SUFFIX "-preview"
+#define VERSION_SUFFIX ""
 
 #include "stb_ds.h"
 #include "lex.h"
