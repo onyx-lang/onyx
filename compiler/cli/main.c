@@ -1020,7 +1020,7 @@ int main(int argc, char *argv[]) {
         char version_buf[128] = {0};
         build_version_string(version_buf, 127);
 
-        bh_printf("Onyx tool-chain version %s\n", version_buf);
+        bh_printf("Onyx toolchain version %s\n", version_buf);
         bh_printf("Runtime: %s\n", onyx_version_runtime());
         bh_printf("Built:   %s\n", onyx_version_build_time());
 
