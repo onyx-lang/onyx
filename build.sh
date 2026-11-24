@@ -6,19 +6,13 @@ DIST_DIR="./dist"
 
 compile_all() {
     if [ "$ONYX_RUNTIME_LIBRARY" = "ovmwasm" ]; then
-        cd interpreter
-        ./build.sh $1
-        cd ..
+        (cd interpreter && ./build.sh "$1")
     fi
 
-    cd compiler
-    ./build.sh $1
-    cd ..
+    (cd compiler && ./build.sh "$1")
 
     if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
-        cd runtime
-        ./build.sh $1
-        cd ..
+        (cd runtime && ./build.sh "$1")
     fi
 
     if [ "$ONYX_RUNTIME_LIBRARY" = "ovmwasm" ]; then
@@ -37,23 +31,24 @@ build_native_archive() {
     OVMWASM="shared/lib/$ONYX_ARCH/lib/libovmwasm.a"
     (cd "$TMP" && ar x "../$OVMWASM")
 
-    NATIVE_FLAGS="-O2 -fPIC -w"
+    # Positional parameters are local to this function. Build the compiler
+    # argv here so each flag stays one word.
+    set -- -O2 -fPIC -w
     if [ ! -z ${ONYX_TARGET+x} ]; then
-        NATIVE_FLAGS="$NATIVE_FLAGS --target=$ONYX_TARGET"
+        set -- "$@" "--target=$ONYX_TARGET"
     fi
 
-    $ONYX_CC $NATIVE_FLAGS -c interpreter/src/jit/native_main.c \
+    "$ONYX_CC" "$@" -c interpreter/src/jit/native_main.c \
         -Iinterpreter/include -Ishared/include \
         -o "$TMP/native_main.o"
 
-    WASM_RT_FLAGS="-DONYX_RUNTIME_LIBRARY=ovmwasm -DUSE_OVM_DEBUGGER -DENABLE_DEBUG_INFO"
+    set -- "$@" -DONYX_RUNTIME_LIBRARY=ovmwasm -DUSE_OVM_DEBUGGER -DENABLE_DEBUG_INFO
     if [ "$ONYX_USE_DYNCALL" = "1" ]; then
-        WASM_RT_FLAGS="$WASM_RT_FLAGS -DUSE_DYNCALL"
+        set -- "$@" -DUSE_DYNCALL
     fi
 
-    $ONYX_CC $NATIVE_FLAGS -c compiler/src/wasm_runtime.c \
+    "$ONYX_CC" "$@" -c compiler/src/wasm_runtime.c \
         -Icompiler/include -Ishared/include -Ishared/include/dyncall \
-        $WASM_RT_FLAGS \
         -o "$TMP/wasm_runtime.o"
 
     if [ -f runtime/libonyx_runtime.a ]; then
@@ -174,8 +169,8 @@ package_all() {
     mkdir -p "$DIST_DIR/bin"
     copy_required compiler/onyx "$DIST_DIR/bin/"
     install_onyx_debug_symbols "$DIST_DIR/bin/onyx"
-    copy_required compiler/libonyx.$suffix "$DIST_DIR/lib/"
-    copy_required compiler/onyx_autocompiler.$suffix "$DIST_DIR/lib/"
+    copy_required compiler/libonyx."$suffix" "$DIST_DIR/lib/"
+    copy_required compiler/onyx_autocompiler."$suffix" "$DIST_DIR/lib/"
     copy_required "shared/include/onyx.h" "$DIST_DIR/include/onyx.h"
 
     mkdir -p "$DIST_DIR/tools"
@@ -252,7 +247,7 @@ install_all() {
     sign_tree "$ONYX_INSTALL_DIR"
 }
 
-for arg in $@; do
+for arg in "$@"; do
     case "$arg" in
         compile) compile_all ;;
         debug) compile_all debug ;;

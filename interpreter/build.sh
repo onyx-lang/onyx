@@ -1,5 +1,29 @@
 #!/bin/sh
 
+# Expand space-separated flag groups into separate arguments for $ONYX_CC.
+invoke_cc() {
+    _ifs=$IFS
+    IFS=' '
+    _joined="$*"
+    IFS=$_ifs
+    set --
+    while [ -n "$_joined" ]; do
+        case "$_joined" in
+            ' '*) _joined=${_joined# } ;;
+            *' '*)
+                set -- "$@" "${_joined%% *}"
+                _joined=${_joined#* }
+                ;;
+            *)
+                set -- "$@" "$_joined"
+                break
+                ;;
+        esac
+    done
+    unset _ifs _joined
+    "$ONYX_CC" "$@"
+}
+
 # FLAGS="-g3 -O2 -DOVM_DEBUG=1 -fno-stack-protector"
 # FLAGS="-g3 -DOVM_VERBOSE=1"
 FLAGS="-O3 -fno-stack-protector"
@@ -19,7 +43,7 @@ for c_file in $C_FILES; do
     case "$c_file" in
         *native_main.c) continue ;;
     esac
-    $ONYX_CC $FLAGS $INCLUDES -fPIC -o build_tmp/$(basename $c_file).o -c $c_file $LIBS
+    invoke_cc "$FLAGS" "$INCLUDES" -fPIC -o "build_tmp/$(basename "$c_file").o" -c "$c_file" "$LIBS"
 done
 
 ar crs "$TARGET" build_tmp/*.o*

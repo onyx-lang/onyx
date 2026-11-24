@@ -1,5 +1,29 @@
 #!/bin/sh
 
+# Expand space-separated flag groups into separate arguments for $ONYX_CC.
+invoke_cc() {
+    _ifs=$IFS
+    IFS=' '
+    _joined="$*"
+    IFS=$_ifs
+    set --
+    while [ -n "$_joined" ]; do
+        case "$_joined" in
+            ' '*) _joined=${_joined# } ;;
+            *' '*)
+                set -- "$@" "${_joined%% *}"
+                _joined=${_joined#* }
+                ;;
+            *)
+                set -- "$@" "$_joined"
+                break
+                ;;
+        esac
+    done
+    unset _ifs _joined
+    "$ONYX_CC" "$@"
+}
+
 C_FILES="library_main astnodes builtins checker clone doc entities errors lex parser types utils wasm_emit wasm_obj wasm_obj_write extensions pb compilation_data "
 LIBS="-lpthread -ldl -lm"
 INCLUDES="-I./include -I../shared/include -I../shared/include/dyncall"
@@ -82,22 +106,22 @@ echo "Compiling libonyx.$suffix"
 OBJECTS=""
 for c_file in $(echo "$C_FILES" | sed 's/ /\n/g;s/\([a-zA-Z_0-9]*\)\n/src\/\1.c\n/g;s/\n/ /g'); do
     obj="$(basename "$c_file").o"
-    $ONYX_CC $FLAGS $INCLUDES -fPIC -o "$obj" -c "$c_file"
+    invoke_cc "$FLAGS" "$INCLUDES" -fPIC -o "$obj" -c "$c_file"
     OBJECTS="$OBJECTS $obj"
 done
 
 # Keep cli/main.c's DWARF in a real object file. Passing the .c file on the
 # link line compiles it to a temporary object that is gone before dsymutil runs.
-$ONYX_CC $FLAGS $INCLUDES -fPIC -o cli_main.o -c cli/main.c
+invoke_cc "$FLAGS" "$INCLUDES" -fPIC -o cli_main.o -c cli/main.c
 
 echo "Compiling onyx executable"
-$ONYX_CC $INCLUDES $FLAGS $OBJECTS cli_main.o -o onyx $LIBS
+invoke_cc "$INCLUDES" "$FLAGS" "$OBJECTS" cli_main.o -o onyx "$LIBS"
 
 FLAGS=""
 if [ ! -z ${ONYX_TARGET+x} ]; then
     FLAGS="$FLAGS --target=$ONYX_TARGET"
 fi
-$ONYX_CC -shared -fPIC $FLAGS -o "libonyx.$suffix" $OBJECTS $LIBS $LIBRARY_BUILD_ARGS
+invoke_cc -shared -fPIC "$FLAGS" -o "libonyx.$suffix" "$OBJECTS" "$LIBS" "$LIBRARY_BUILD_ARGS"
 
 # It does seem possible to allow for the CLI to directly
 # use the shared library, but it was causing some weird
@@ -111,13 +135,13 @@ $ONYX_CC -shared -fPIC $FLAGS -o "libonyx.$suffix" $OBJECTS $LIBS $LIBRARY_BUILD
 #   $LIBS
 
 echo "Compiling onyx auto-compiler"
-$ONYX_CC -shared -fPIC $FLAGS $INCLUDES \
+invoke_cc -shared -fPIC "$FLAGS" "$INCLUDES" \
     -Wno-int-conversion \
     -o "onyx_autocompiler.$suffix" \
     src/autocompiler_binding.c \
     -L. -lonyx \
-    $LIBS \
-    $AUTOCOMPILER_BUILD_ARGS
+    "$LIBS" \
+    "$AUTOCOMPILER_BUILD_ARGS"
 
 
 # I don't think an archive file is needed to ship right now,
@@ -140,4 +164,4 @@ elif [ "$(uname)" = "Darwin" ]; then
     rm -rf onyx.dSYM
 fi
 
-rm -f *.o
+rm -f ./*.o
