@@ -266,19 +266,35 @@ version() {
 }
 
 semverParseInto() {
-  local RE='v?([0-9]+)[.]([0-9]+)[.]([0-9]+)([.0-9A-Za-z-]*)'
+  # major[.minor[.patch]][suffix], with an optional leading "v".
+  # A release may omit minor and patch, so 2611 is 2611.0.0 and 2611.1 is 2611.1.0.
+  local RE='^v?([0-9]+)(\.([0-9]+))?(\.([0-9]+))?([-.][.0-9A-Za-z-]*)?$'
 
-  # # strip word "v" if exists
-  # version=$(echo "${1//v/}")
+  local major minor patch special
+  major=$(echo "$1" | sed -E "s#$RE#\1#")
+  minor=$(echo "$1" | sed -E "s#$RE#\3#")
+  patch=$(echo "$1" | sed -E "s#$RE#\5#")
+  special=$(echo "$1" | sed -E "s#$RE#\6#")
 
-  #MAJOR
-  eval $2=$(echo $1 | sed -E "s#$RE#\1#")
-  #MINOR
-  eval $3=$(echo $1 | sed -E "s#$RE#\2#")
-  #MINOR
-  eval $4=$(echo $1 | sed -E "s#$RE#\3#")
-  #SPECIAL
-  eval $5=$(echo $1 | sed -E "s#$RE#\4#")
+  # sed leaves the input unchanged when the pattern does not match,
+  # which would put a non-numeric string into every field.
+  case "$major" in
+    *[!0-9]*|'')
+      major=0
+      minor=0
+      patch=0
+      special=
+      ;;
+    *)
+      [ -z "$minor" ] && minor=0
+      [ -z "$patch" ] && patch=0
+      ;;
+  esac
+
+  eval "$2=\$major"
+  eval "$3=\$minor"
+  eval "$4=\$patch"
+  eval "$5=\$special"
 }
 
 ###

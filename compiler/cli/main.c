@@ -884,7 +884,9 @@ static void perform_self_upgrade(CLIArgs *cli_args, char *version) {
     waitpid(curl_pid, &status, 0);
 
     if (status == 0) {
-        execlp("sh", "sh", file_path, version, onyx_version_runtime(), NULL);
+        // An empty version asks install.sh for the latest release. Passing ""
+        // keeps the runtime in $2; a NULL argument would end the execlp list.
+        execlp("sh", "sh", file_path, version && version[0] ? version : "", onyx_version_runtime(), NULL);
     }
 
     printf("error: Failed to download upgrade script.\n");
@@ -1029,14 +1031,18 @@ int main(int argc, char *argv[]) {
 
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     if (cli_args.action == ONYX_COMPILE_ACTION_SELF_UPGRADE) {
-        if (arg_parse_start < argc && !is_flag(argv[arg_parse_start])) {
-            perform_self_upgrade(&cli_args, argv[arg_parse_start]);
-        }
-
         if (arg_parse_start < argc && !strcmp(argv[arg_parse_start], "--help")) {
             print_subcommand_help(argv[1]);
+            return 1;
         }
 
+        // No version means the latest release. install.sh treats an empty $1 that way.
+        char *version = NULL;
+        if (arg_parse_start < argc && !is_flag(argv[arg_parse_start])) {
+            version = argv[arg_parse_start];
+        }
+
+        perform_self_upgrade(&cli_args, version);
         return 1;
     }
 
