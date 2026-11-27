@@ -23,7 +23,14 @@ void insert_poly_sln_into_scope(Context *context, Scope* scope, AstPolySolution 
         case PSK_Value:
             // CLEANUP: Maybe clone this?
             // assert(sln->value->flags & Ast_Flag_Comptime);
-            if ((sln->value->flags & Ast_Flag_Comptime) == 0) {
+            // Defaults are checked later, with the concrete struct or union,
+            // because they can name earlier parameters.
+            if (sln->value == NULL) {
+                ONYX_ERROR(sln->poly_sym->token->pos, Error_Critical, "Expected value to be compile time known.");
+                return;
+            }
+
+            if ((sln->value->flags & Ast_Flag_Comptime) == 0 && !sln->from_default) {
                 ONYX_ERROR(sln->value->token->pos, Error_Critical, "Expected value to be compile time known.");
                 return;
             }
@@ -459,7 +466,21 @@ static PolySolveResult solve_poly_type(Context *context, AstNode* target, AstTyp
                 if (elem.actual->kind == Type_Kind_Struct) slns = elem.actual->Struct.poly_sln;
                 if (elem.actual->kind == Type_Kind_Union)  slns = elem.actual->Union.poly_sln;
 
-                if (bh_arr_length(slns) != bh_arr_length(((AstPolyCallType *) elem.type_expr)->params)) break;
+                {
+                    // A pattern may omit a suffix of parameters that have defaults.
+                    // Map($K, $V) still matches Map(K, V, comp = ...).
+                    i32 pattern_count = bh_arr_length(((AstPolyCallType *) elem.type_expr)->params);
+                    i32 sln_count = bh_arr_length(slns);
+                    if (pattern_count != sln_count) {
+                        b32 suffix_is_defaulted = pattern_count < sln_count;
+                        for (i32 i = pattern_count; suffix_is_defaulted && i < sln_count; i++) {
+                            // poly_sym is the AstPolyStructParam for struct and union solutions.
+                            AstPolyStructParam *param = (AstPolyStructParam *) slns[i].poly_sym;
+                            if (!param || !param->default_value) suffix_is_defaulted = 0;
+                        }
+                        if (!suffix_is_defaulted) break;
+                    }
+                }
 
                 AstPolyCallType* pt = (AstPolyCallType *) elem.type_expr;
 
@@ -1100,8 +1121,54 @@ AstNode* polymorphic_proc_try_solidify(Context *context, AstFunction* pp, bh_arr
         }
     }
 
-    if (valid_argument_count == bh_arr_length(pp->poly_params)) {
-        return (AstNode *) polymorphic_proc_solidify(context, pp, slns, tkn);
+    // A pattern such as Map($K, $V) also captures omitted parameters that have
+    // defaults. #solidify format_map {K=..., V=...} does not name that capture.
+    // When every remaining variable is one of those captures, fill it with the
+    // default expression and solidify. A later call still solves the capture
+    // from the argument when a real variable is left open.
+    i32 captured_fill_count = 0;
+    bh_arr_each(AstPolyParam, param, pp->poly_params) {
+        if (!param->captured_default) continue;
+
+        b32 already = 0;
+        bh_arr_each(AstPolySolution, sln, slns) {
+            if (token_equals(sln->poly_sym->token, param->poly_sym->token)) {
+                already = 1;
+                break;
+            }
+        }
+        if (!already) captured_fill_count++;
+    }
+
+    if (valid_argument_count + captured_fill_count == bh_arr_length(pp->poly_params)) {
+        bh_arr(AstPolySolution) full = slns;
+        if (captured_fill_count > 0) {
+            full = NULL;
+            bh_arr_new(context->gp_alloc, full, valid_argument_count + captured_fill_count);
+            bh_arr_each(AstPolySolution, sln, slns) bh_arr_push(full, *sln);
+
+            bh_arr_each(AstPolyParam, param, pp->poly_params) {
+                if (!param->captured_default) continue;
+
+                b32 already = 0;
+                bh_arr_each(AstPolySolution, sln, full) {
+                    if (token_equals(sln->poly_sym->token, param->poly_sym->token)) {
+                        already = 1;
+                        break;
+                    }
+                }
+                if (already) continue;
+
+                bh_arr_push(full, ((AstPolySolution) {
+                    .kind = PSK_Value,
+                    .poly_sym = param->poly_sym,
+                    .value = param->captured_default,
+                    .from_default = 1,
+                }));
+            }
+        }
+
+        return (AstNode *) polymorphic_proc_solidify(context, pp, full, tkn);
 
     } else {
         // HACK: Some of these initializations assume that the entity for this polyproc has
@@ -1426,6 +1493,144 @@ char* build_poly_struct_name(Context *context, char *name, Type* type) {
     return bh_aprintf(context->gp_alloc, "%s", name_buf);
 }
 
+typedef struct PolyParamPrep {
+    bh_arr(AstPolySolution) slns;
+    b32 owned;
+    b32 ok;
+} PolyParamPrep;
+
+// `value` overlays `ast_type`. A type solution has to leave that slot null
+// so the concrete type does not try to type-check a Type*.
+static void poly_solution_set_type(AstPolySolution *sln, Type *type) {
+    sln->kind = PSK_Type;
+    sln->ast_type = NULL;
+    sln->type = type;
+}
+
+static b32 poly_default_might_be_type(AstTyped *value) {
+    if (!value) return 0;
+    if (value->kind == Ast_Kind_Symbol) return 1;
+    return node_is_type((AstNode *) value);
+}
+
+// Fills omitted arguments from parameter defaults. Type defaults are resolved
+// here so `S()` and `S(i32)` share a type when `T: type_expr = i32`.
+// The returned array is owned when `owned` is set; the caller frees it.
+static PolyParamPrep prepare_poly_param_solutions(Context *context, bh_arr(AstPolyStructParam) params, bh_arr(AstPolySolution) given, Scope *parent_scope, OnyxFilePos pos, char *name) {
+    PolyParamPrep prep = { given, 0, 1 };
+    i32 provided = bh_arr_length(given);
+    i32 expected = bh_arr_length(params);
+
+    i32 min_required = expected;
+    for (i32 i = 0; i < expected; i++) {
+        if (params[i].default_value) {
+            min_required = i;
+            break;
+        }
+    }
+
+    if (provided < min_required || provided > expected) {
+        if (min_required == expected) {
+            ONYX_ERROR(pos, Error_Critical, "Wrong number of arguments for '%s'. Expected %d, got %d.",
+                name, expected, provided);
+        } else if (provided > expected) {
+            ONYX_ERROR(pos, Error_Critical, "Wrong number of arguments for '%s'. Expected at most %d, got %d.",
+                name, expected, provided);
+        } else {
+            ONYX_ERROR(pos, Error_Critical, "Wrong number of arguments for '%s'. Expected at least %d, got %d.",
+                name, min_required, provided);
+        }
+        prep.ok = 0;
+        return prep;
+    }
+
+    // bh_arr_new grows a non-null array in place. Start from NULL so the
+    // caller's solutions are copied, not appended onto.
+    bh_arr(AstPolySolution) slns = NULL;
+    if (provided < expected) {
+        bh_arr_new(context->gp_alloc, slns, expected);
+        for (i32 i = 0; i < provided; i++) bh_arr_push(slns, given[i]);
+        for (i32 i = provided; i < expected; i++) {
+            bh_arr_push(slns, ((AstPolySolution) {
+                .kind = PSK_Value,
+                .value = params[i].default_value,
+                .from_default = 1,
+            }));
+        }
+        prep.slns = slns;
+        prep.owned = 1;
+    } else {
+        slns = given;
+    }
+
+    for (i32 i = 0; i < expected; i++) {
+        slns[i].poly_sym = (AstNode *) &params[i];
+    }
+
+    b32 needs_promote = 0;
+    for (i32 i = 0; i < expected; i++) {
+        if (slns[i].from_default && slns[i].kind == PSK_Value && poly_default_might_be_type(slns[i].value)) {
+            needs_promote = 1;
+            break;
+        }
+    }
+
+    if (!needs_promote) return prep;
+
+    // Earlier parameters have to be visible while later defaults are resolved,
+    // so `U: type_expr = T` sees the solved `T`.
+    Scope *resolve_scope = scope_create(context, parent_scope, pos);
+    for (i32 i = 0; i < expected; i++) {
+        if (slns[i].from_default && slns[i].kind == PSK_Value && poly_default_might_be_type(slns[i].value)) {
+            AstTyped *value = slns[i].value;
+            AstNode *resolved = (AstNode *) value;
+
+            if (value->kind == Ast_Kind_Symbol) {
+                resolved = symbol_resolve(context, resolve_scope, value->token);
+                if (!resolved && !context->cycle_detected) {
+                    prep.ok = 0;
+                    return prep;
+                }
+            }
+
+            if (resolved && node_is_type(resolved)) {
+                Type *type = type_build_from_ast(context, (AstType *) resolved);
+                if (!type) {
+                    prep.ok = 0;
+                    return prep;
+                }
+                poly_solution_set_type(&slns[i], type);
+            }
+        }
+
+        insert_poly_sln_into_scope(context, resolve_scope, &slns[i]);
+    }
+
+    return prep;
+}
+
+static void clone_defaulted_poly_values(Context *context, bh_arr(AstPolySolution) slns, Scope *scope) {
+    bh_arr_each(AstPolySolution, sln, slns) {
+        if (!sln->from_default || sln->kind != PSK_Value || !sln->value) continue;
+
+        // Code blocks are identified by pointer. Cloning one would make
+        // Map(K, V) a different type from the Map(K, V, comp) solved off an
+        // existing value, even when both use the same default. Share the
+        // original node and give it the polymorphic type's scope, which is
+        // the parent of every instantiation scope.
+        if (sln->value->kind == Ast_Kind_Code_Block) {
+            AstCodeBlock *code = (AstCodeBlock *) sln->value;
+            if (!code->enclosing_scope) code->enclosing_scope = scope->parent;
+            continue;
+        }
+
+        // Other defaults are cloned so each instantiation can type-check
+        // them against its own parameters. sizeof(T) is the important case.
+        // The cache key was already built from the original node.
+        sln->value = (AstTyped *) ast_clone(context, (AstNode *) sln->value);
+    }
+}
+
 Type* polymorphic_struct_lookup(Context *context, AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed) {
     if (ps_type->scope == NULL) {
         return NULL;
@@ -1437,20 +1642,12 @@ Type* polymorphic_struct_lookup(Context *context, AstPolyStructType* ps_type, bh
         sh_new_arena(ps_type->concrete_structs);
     }
 
-    if (bh_arr_length(slns) != bh_arr_length(ps_type->poly_params)) {
-        ONYX_ERROR(pos, Error_Critical, "Wrong number of arguments for '%s'. Expected %d, got %d.",
-            ps_type->name,
-            bh_arr_length(ps_type->poly_params),
-            bh_arr_length(slns));
-
+    PolyParamPrep prep = prepare_poly_param_solutions(context, ps_type->poly_params, slns, ps_type->scope, pos, ps_type->name);
+    if (!prep.ok) {
+        if (prep.owned) bh_arr_free(prep.slns);
         return NULL;
     }
-
-    i32 i = 0;
-    bh_arr_each(AstPolySolution, sln, slns) {
-        sln->poly_sym = (AstNode *) &ps_type->poly_params[i];
-        i++;
-    }
+    slns = prep.slns;
 
     char* unique_key = build_poly_slns_unique_key(context, slns);
     i32 index = shgeti(ps_type->concrete_structs, unique_key);
@@ -1458,27 +1655,38 @@ Type* polymorphic_struct_lookup(Context *context, AstPolyStructType* ps_type, bh
         AstStructType* concrete_struct = ps_type->concrete_structs[index].value;
 
         if (concrete_struct->entity_type->state < Entity_State_Check_Types) {
+            if (prep.owned) bh_arr_free(slns);
             return NULL;
         }
 
         if (concrete_struct->entity_type->state == Entity_State_Failed) {
+            if (prep.owned) bh_arr_free(slns);
             return (Type *) &context->node_that_signals_failure;
         }
 
         Type* cs_type = type_build_from_ast(context, (AstType *) concrete_struct);
-        if (!cs_type) return NULL;
+        if (!cs_type) {
+            if (prep.owned) bh_arr_free(slns);
+            return NULL;
+        }
 
         b32 first_construction = cs_type->Struct.constructed_from == NULL;
         cs_type->Struct.constructed_from = (AstType *) ps_type;
-        
-        if (cs_type->Struct.poly_sln == NULL) cs_type->Struct.poly_sln = bh_arr_copy(context->gp_alloc, slns);
+
+        // polymorphic_arguments holds the per-instantiation clones of defaulted
+        // values. The lookup array still points at the original default nodes,
+        // which is what the cache key used.
+        if (cs_type->Struct.poly_sln == NULL)
+            cs_type->Struct.poly_sln = bh_arr_copy(context->gp_alloc, concrete_struct->polymorphic_arguments);
         if (cs_type->Struct.name == NULL)     cs_type->Struct.name = build_poly_struct_name(context, ps_type->name, cs_type);
         if (first_construction) compilation_log_emit_type(context, cs_type);
 
+        if (prep.owned) bh_arr_free(slns);
         return cs_type;
     }
 
     Scope* sln_scope = scope_create(context, ps_type->scope, ps_type->token->pos);
+    clone_defaulted_poly_values(context, slns, sln_scope);
     insert_poly_slns_into_scope(context, sln_scope, slns);
 
     AstStructType* concrete_struct = (AstStructType *) ast_clone(context, ps_type->base_struct);
@@ -1499,6 +1707,7 @@ Type* polymorphic_struct_lookup(Context *context, AstPolyStructType* ps_type, bh
 
     shput(ps_type->concrete_structs, unique_key, concrete_struct);
     add_entities_for_node(&context->entities, NULL, (AstNode *) concrete_struct, sln_scope, NULL);
+    if (prep.owned) bh_arr_free(slns);
     return NULL;
 }
 
@@ -1513,20 +1722,12 @@ Type* polymorphic_union_lookup(Context *context, AstPolyUnionType* pu_type, bh_a
         sh_new_arena(pu_type->concrete_unions);
     }
 
-    if (bh_arr_length(slns) != bh_arr_length(pu_type->poly_params)) {
-        ONYX_ERROR(pos, Error_Critical, "Wrong number of arguments for '%s'. Expected %d, got %d.",
-            pu_type->name,
-            bh_arr_length(pu_type->poly_params),
-            bh_arr_length(slns));
-
+    PolyParamPrep prep = prepare_poly_param_solutions(context, pu_type->poly_params, slns, pu_type->scope, pos, pu_type->name);
+    if (!prep.ok) {
+        if (prep.owned) bh_arr_free(prep.slns);
         return NULL;
     }
-
-    i32 i = 0;
-    bh_arr_each(AstPolySolution, sln, slns) {
-        sln->poly_sym = (AstNode *) &pu_type->poly_params[i];
-        i++;
-    }
+    slns = prep.slns;
 
     char* unique_key = build_poly_slns_unique_key(context, slns);
     i32 index = shgeti(pu_type->concrete_unions, unique_key);
@@ -1534,27 +1735,35 @@ Type* polymorphic_union_lookup(Context *context, AstPolyUnionType* pu_type, bh_a
         AstUnionType* concrete_union = pu_type->concrete_unions[index].value;
 
         if (concrete_union->entity->state < Entity_State_Check_Types) {
+            if (prep.owned) bh_arr_free(slns);
             return NULL;
         }
 
         if (concrete_union->entity->state == Entity_State_Failed) {
+            if (prep.owned) bh_arr_free(slns);
             return (Type *) &context->node_that_signals_failure;
         }
 
         Type* cu_type = type_build_from_ast(context, (AstType *) concrete_union);
-        if (!cu_type) return NULL;
+        if (!cu_type) {
+            if (prep.owned) bh_arr_free(slns);
+            return NULL;
+        }
 
         b32 first_construction = cu_type->Union.constructed_from == NULL;
         cu_type->Union.constructed_from = (AstType *) pu_type;
-        
-        if (cu_type->Union.poly_sln == NULL) cu_type->Union.poly_sln = bh_arr_copy(context->gp_alloc, slns);
+
+        if (cu_type->Union.poly_sln == NULL)
+            cu_type->Union.poly_sln = bh_arr_copy(context->gp_alloc, concrete_union->polymorphic_arguments);
         cu_type->Union.name = build_poly_struct_name(context, pu_type->name, cu_type);
         if (first_construction) compilation_log_emit_type(context, cu_type);
 
+        if (prep.owned) bh_arr_free(slns);
         return cu_type;
     }
 
     Scope* sln_scope = scope_create(context, pu_type->scope, pu_type->token->pos);
+    clone_defaulted_poly_values(context, slns, sln_scope);
     insert_poly_slns_into_scope(context, sln_scope, slns);
 
     AstUnionType* concrete_union = (AstUnionType *) ast_clone(context, pu_type->base_union);
@@ -1575,5 +1784,6 @@ Type* polymorphic_union_lookup(Context *context, AstPolyUnionType* pu_type, bh_a
 
     shput(pu_type->concrete_unions, unique_key, concrete_union);
     add_entities_for_node(&context->entities, NULL, (AstNode *) concrete_union, sln_scope, NULL);
+    if (prep.owned) bh_arr_free(slns);
     return NULL;
 }

@@ -1,0 +1,70 @@
+use core {*}
+
+main :: () {
+    Arr :: struct (T: type_expr, N: i32 = 3) {
+        xs: [N] T;
+    }
+
+    a: Arr(i32);
+    b: Arr(i32, 3);
+    a = b;
+    println(a.xs.count);
+
+    c: Arr(i32, 1);
+    println(c.xs.count);
+
+    Sized :: struct (T: type_expr, N: i32 = sizeof T) {
+        n: i32 = N;
+    }
+    println(Sized(u8).{}.n);
+    println(Sized(i32).{}.n);
+
+    Pair :: struct (T: type_expr = i32, U: type_expr = T) {
+        x: T;
+        y: U;
+    }
+    p: Pair();
+    p.x = 10;
+    p.y = 20;
+    println(p.x + p.y);
+
+    s: Pair(str);
+    s.x = "ab";
+    s.y = "cd";
+    println(s.x);
+    println(s.y);
+
+    Holder :: struct (T: type_expr, eq: Code = [a, b](a == b)) {
+        value: T;
+    }
+
+    same :: (h: Holder($T), other: T) -> bool {
+        return #unquote h.eq(h.value, other);
+    }
+
+    h: Holder(i32);
+    h.value = 3;
+    println(same(h, 3));
+    println(same(h, 4));
+
+    always: Holder(i32, [a, b](true));
+    always.value = 1;
+    println(same(always, 9));
+
+    Result :: union (T: type_expr, E: type_expr = i32) {
+        Ok: T;
+        Err: E;
+    }
+
+    r: Result(str) = .{ Ok = "yes" };
+    switch r {
+        case .Ok as v do println(v);
+        case .Err do println("err");
+    }
+
+    e: Result(str) = .{ Err = 7 };
+    switch e {
+        case .Ok do println("ok");
+        case .Err as v do println(v);
+    }
+}

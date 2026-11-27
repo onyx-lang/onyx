@@ -4470,9 +4470,143 @@ static void emit_tags_once(Context *context, b32 *emitted, u32 target_id, b32 ta
     *emitted = 1;
 }
 
+// Map($K, $V) is a pattern, so a procedure written that way has to accept a
+// Map whose omitted parameters were overridden. Construction Map(K, V) still
+// fills those in with the defaults. Capture each omitted defaulted parameter
+// as its own polymorphic variable, solved from the argument.
+static b32 poly_call_contains_polyvar(AstPolyCallType *pcall) {
+    if (!pcall->params) return 0;
+
+    bh_arr_each(AstNode *, param, pcall->params) {
+        if (*param && (*param)->kind == Ast_Kind_Symbol && ((*param)->flags & Ast_Flag_Symbol_Is_PolyVar)) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static CheckStatus expand_defaulted_poly_call(Context *context, AstFunction *func, u32 param_idx, AstType *root, AstPolyCallType *pcall) {
+    if (!poly_call_contains_polyvar(pcall)) return Check_Success;
+
+    AstNode *callee = pcall->callee ? strip_aliases((AstNode *) pcall->callee) : NULL;
+    if (!callee) return Check_Success;
+
+    if (callee->kind == Ast_Kind_Symbol) {
+        if (!func->parent_scope_of_poly_proc) return Check_Success;
+
+        AstNode *resolved = symbol_resolve(context, func->parent_scope_of_poly_proc, callee->token);
+        if (!resolved) {
+            if (context->cycle_detected) return Check_Success;
+            return Check_Yield;
+        }
+
+        callee = strip_aliases(resolved);
+    }
+
+    bh_arr(AstPolyStructParam) struct_params = NULL;
+    if (callee->kind == Ast_Kind_Poly_Struct_Type) {
+        struct_params = ((AstPolyStructType *) callee)->poly_params;
+    } else if (callee->kind == Ast_Kind_Poly_Union_Type) {
+        struct_params = ((AstPolyUnionType *) callee)->poly_params;
+    } else {
+        return Check_Success;
+    }
+
+    i32 given = bh_arr_length(pcall->params);
+    i32 expected = bh_arr_length(struct_params);
+    if (given >= expected) return Check_Success;
+
+    for (i32 i = given; i < expected; i++) {
+        if (!struct_params[i].default_value) return Check_Success;
+    }
+
+    if (!func->poly_params) {
+        bh_arr_new(context->gp_alloc, func->poly_params, expected - given);
+    }
+
+    for (i32 i = given; i < expected; i++) {
+        OnyxToken *name_token = bh_alloc_item(context->ast_alloc, OnyxToken);
+        name_token->text = bh_aprintf(context->ast_alloc, "__poly_default_%d_%d", (int) param_idx, (int) i);
+        name_token->length = strlen(name_token->text);
+        name_token->type = Token_Type_Symbol;
+        name_token->pos = pcall->token ? pcall->token->pos : func->token->pos;
+
+        AstNode *sym = make_symbol(context, name_token);
+        sym->flags |= Ast_Flag_Symbol_Is_PolyVar;
+        bh_arr_push(pcall->params, sym);
+
+        AstPolyParam pp = { 0 };
+        pp.kind = PPK_Poly_Type;
+        pp.idx = param_idx;
+        pp.poly_sym = sym;
+        pp.type_expr = root;
+        pp.captured_default = struct_params[i].default_value;
+        bh_arr_push(func->poly_params, pp);
+    }
+
+    return Check_Success;
+}
+
+static CheckStatus expand_defaulted_poly_params_in_type(Context *context, AstFunction *func, u32 param_idx, AstType *root, AstType *type_node) {
+    if (!type_node) return Check_Success;
+
+    switch (type_node->kind) {
+        case Ast_Kind_Pointer_Type:
+            return expand_defaulted_poly_params_in_type(context, func, param_idx, root, ((AstPointerType *) type_node)->elem);
+
+        case Ast_Kind_Multi_Pointer_Type:
+            return expand_defaulted_poly_params_in_type(context, func, param_idx, root, ((AstMultiPointerType *) type_node)->elem);
+
+        case Ast_Kind_Array_Type:
+            return expand_defaulted_poly_params_in_type(context, func, param_idx, root, ((AstArrayType *) type_node)->elem);
+
+        case Ast_Kind_Slice_Type:
+            return expand_defaulted_poly_params_in_type(context, func, param_idx, root, ((AstSliceType *) type_node)->elem);
+
+        case Ast_Kind_DynArr_Type:
+            return expand_defaulted_poly_params_in_type(context, func, param_idx, root, ((AstDynArrType *) type_node)->elem);
+
+        case Ast_Kind_VarArg_Type:
+            return expand_defaulted_poly_params_in_type(context, func, param_idx, root, ((AstVarArgType *) type_node)->elem);
+
+        case Ast_Kind_Alias:
+            return expand_defaulted_poly_params_in_type(context, func, param_idx, root, (AstType *) ((AstAlias *) type_node)->alias);
+
+        case Ast_Kind_Type_Alias:
+            return expand_defaulted_poly_params_in_type(context, func, param_idx, root, ((AstTypeAlias *) type_node)->to);
+
+        case Ast_Kind_Poly_Call_Type: {
+            AstPolyCallType *pcall = (AstPolyCallType *) type_node;
+            i32 count = bh_arr_length(pcall->params);
+            for (i32 i = 0; i < count; i++) {
+                AstNode *param = pcall->params[i];
+                if (!param) continue;
+                if (param->kind > Ast_Kind_Type_Start && param->kind < Ast_Kind_Type_End) {
+                    CheckStatus cs = expand_defaulted_poly_params_in_type(context, func, param_idx, root, (AstType *) param);
+                    if (cs != Check_Success) return cs;
+                }
+            }
+
+            return expand_defaulted_poly_call(context, func, param_idx, root, pcall);
+        }
+
+        default: return Check_Success;
+    }
+}
+
 CHECK_FUNC(polyproc, AstFunction* pp) {
     pp->flags |= Ast_Flag_Comptime;
     pp->parent_scope_of_poly_proc = context->checker.current_scope;
+
+    if (pp->params) {
+        u32 param_idx = 0;
+        bh_arr_each(AstParam, param, pp->params) {
+            CheckStatus cs = expand_defaulted_poly_params_in_type(context, pp, param_idx, param->local->type_node, param->local->type_node);
+            if (cs != Check_Success) return cs;
+            param_idx++;
+        }
+    }
 
     bh_arr_each(AstPolyParam, p, pp->poly_params) {
         if (p->kind != PPK_Baked_Value) continue;
@@ -4874,6 +5008,19 @@ CHECK_FUNC(meta_tags, bh_arr(AstTyped *) tags) {
     return Check_Success;
 }
 
+static CheckStatus ensure_poly_default_is_comptime(Context *context, AstPolySolution *sln) {
+    if (!sln->from_default || sln->kind != PSK_Value || !sln->value) return Check_Success;
+    if (sln->value->flags & Ast_Flag_Comptime) return Check_Success;
+
+    OnyxToken *name = sln->poly_sym ? sln->poly_sym->token : NULL;
+    if (name) {
+        ERROR_(sln->value->token->pos, "Default value for '%b' must be compile-time known.",
+            name->text, name->length);
+    }
+
+    ERROR(sln->value->token->pos, "Default value for this parameter must be compile-time known.");
+}
+
 CHECK_FUNC(struct, AstStructType* s_node) {
     if (s_node->entity_defaults && s_node->entity_defaults->state < Entity_State_Check_Types)
         YIELD(s_node->token->pos, "Waiting for struct member defaults to pass symbol resolution.");
@@ -4912,6 +5059,9 @@ CHECK_FUNC(struct, AstStructType* s_node) {
                     type_get_name(context, arg_type),
                     type_get_name(context, s_node->polymorphic_arguments[i].value->type));
             }
+
+            CheckStatus default_cs = ensure_poly_default_is_comptime(context, &s_node->polymorphic_arguments[i]);
+            if (default_cs > Check_Errors_Start) return default_cs;
         }
     }
 
@@ -5145,6 +5295,9 @@ CHECK_FUNC(union, AstUnionType *u_node) {
                     type_get_name(context, arg_type),
                     type_get_name(context, u_node->polymorphic_arguments[i].value->type));
             }
+
+            CheckStatus default_cs = ensure_poly_default_is_comptime(context, &u_node->polymorphic_arguments[i]);
+            if (default_cs > Check_Errors_Start) return default_cs;
         }
     }
 

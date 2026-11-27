@@ -3006,6 +3006,46 @@ static void type_create_scope(OnyxParser *parser, Scope ** scope, OnyxToken* tok
     }
 }
 
+// (Name: Type, Name: Type = default, ...)
+// The opening '(' has already been consumed. Defaults have to be a suffix,
+// matching procedure parameters.
+static bh_arr(AstPolyStructParam) parse_polymorphic_type_params(OnyxParser *parser) {
+    bh_arr(AstPolyStructParam) poly_params = NULL;
+    bh_arr_new(parser->context->gp_alloc, poly_params, 1);
+
+    b32 had_default = 0;
+    while (!consume_token_if_next(parser, ')')) {
+        if (parser->hit_unexpected_token) return NULL;
+
+        OnyxToken* sym_token = expect_token(parser, Token_Type_Symbol);
+        expect_token(parser, ':');
+
+        AstType* param_type = parse_type(parser);
+
+        AstTyped *default_value = NULL;
+        if (consume_token_if_next(parser, '=')) {
+            default_value = parse_expression(parser, 0);
+            had_default = 1;
+        } else if (had_default) {
+            ONYX_ERROR(sym_token->pos, Error_Critical, "Parameters after one with a default value must also have a default value.");
+            parser->hit_unexpected_token = 1;
+            return NULL;
+        }
+
+        bh_arr_push(poly_params, ((AstPolyStructParam) {
+            .token = sym_token,
+            .type_node = param_type,
+            .type = NULL,
+            .default_value = default_value,
+        }));
+
+        if (parser->curr->type != ')')
+            expect_token(parser, ',');
+    }
+
+    return poly_params;
+}
+
 static AstStructType* parse_struct(OnyxParser* parser) {
     OnyxToken *s_token = expect_token(parser, Token_Type_Keyword_Struct);
 
@@ -3026,26 +3066,8 @@ static AstStructType* parse_struct(OnyxParser* parser) {
 
     // Parse polymorphic parameters
     if (consume_token_if_next(parser, '(')) {
-        bh_arr(AstPolyStructParam) poly_params = NULL;
-        bh_arr_new(parser->context->gp_alloc, poly_params, 1);
-
-        while (!consume_token_if_next(parser, ')')) {
-            if (parser->hit_unexpected_token) return NULL;
-
-            OnyxToken* sym_token = expect_token(parser, Token_Type_Symbol);
-            expect_token(parser, ':');
-
-            AstType* param_type = parse_type(parser);
-
-            bh_arr_push(poly_params, ((AstPolyStructParam) {
-                .token = sym_token,
-                .type_node = param_type,
-                .type = NULL,
-            }));
-
-            if (parser->curr->type != ')')
-                expect_token(parser, ',');
-        }
+        bh_arr(AstPolyStructParam) poly_params = parse_polymorphic_type_params(parser);
+        if (poly_params == NULL) return NULL;
 
         poly_struct = make_node(AstPolyStructType, Ast_Kind_Poly_Struct_Type);
         poly_struct->token = s_token;
@@ -3241,26 +3263,8 @@ static AstUnionType* parse_union(OnyxParser* parser) {
     }
 
     if (consume_token_if_next(parser, '(')) {
-        bh_arr(AstPolyStructParam) poly_params = NULL;
-        bh_arr_new(parser->context->gp_alloc, poly_params, 1);
-
-        while (!consume_token_if_next(parser, ')')) {
-            if (parser->hit_unexpected_token) return NULL;
-
-            OnyxToken* sym_token = expect_token(parser, Token_Type_Symbol);
-            expect_token(parser, ':');
-
-            AstType* param_type = parse_type(parser);
-
-            bh_arr_push(poly_params, ((AstPolyStructParam) {
-                .token = sym_token,
-                .type_node = param_type,
-                .type = NULL,
-            }));
-
-            if (parser->curr->type != ')')
-                expect_token(parser, ',');
-        }
+        bh_arr(AstPolyStructParam) poly_params = parse_polymorphic_type_params(parser);
+        if (poly_params == NULL) return NULL;
 
         poly_union = make_node(AstPolyUnionType, Ast_Kind_Poly_Union_Type);
         poly_union->token = union_token;

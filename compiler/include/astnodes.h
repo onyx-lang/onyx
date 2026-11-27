@@ -1118,6 +1118,10 @@ struct AstStructMember {
 };
 struct AstPolyStructParam {
     AstTyped_base;
+
+    // Used when this parameter is omitted at instantiation.
+    // Later parameters must have defaults too.
+    AstTyped *default_value;
 };
 struct AstPolyStructType {
     AstType_base;
@@ -1482,6 +1486,11 @@ struct AstPolyParam {
     // symbol.
     AstType* type_expr;
 
+    // Set when this variable was invented to capture an omitted
+    // struct or union parameter. A #solidify that does not mention it
+    // uses this expression.
+    AstTyped *captured_default;
+
     // Used for baked values. The expected type of the parameter.
     Type* type;
 
@@ -1506,12 +1515,17 @@ struct AstPolySolution {
     union {
         struct {
             // If `type` is null, it is filled in with this type.
+            // `value` overlays `ast_type`, so a type solution leaves `value` null.
             AstType* ast_type;
             Type*    type;
         };
 
         AstTyped* value;
     };
+
+    // The argument was omitted and taken from the parameter's default.
+    // It is type-checked with the concrete struct or union, not at the call site.
+    b32 from_default;
 };
 
 struct AstSolidifiedFunction {
