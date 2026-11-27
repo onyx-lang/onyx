@@ -5534,6 +5534,7 @@ void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstKind kind) {
 
 OnyxParser onyx_parser_create(Context *context, OnyxTokenizer *tokenizer) {
     OnyxParser parser;
+    memset(&parser, 0, sizeof parser);
 
     parser.allocator = context->ast_alloc;
     parser.context = context;
